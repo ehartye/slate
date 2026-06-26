@@ -1,0 +1,16 @@
+/* @name Noir */
+/* @mode dark */
+:root {
+  --bg: #0a0a0b; --bg-elevated: #141416; --fg: #f1f1f3; --fg-muted: #87878f;
+  --border: #232327; --accent: #ff4438; --accent-soft: rgba(255, 68, 56, 0.16);
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  --ui-font: 'Bahnschrift', 'Arial Narrow', 'Helvetica Neue', sans-serif;
+  --editor-bg: #0a0a0b; --editor-fg: #f1f1f3; --editor-font: 'Consolas', ui-monospace, monospace;
+  --prose-bg: #0a0a0b; --prose-fg: #ededf0;
+  --prose-font: Georgia, 'Charter', 'Times New Roman', serif;
+  --prose-heading-font: 'Bahnschrift', 'Arial Narrow', 'Helvetica Neue', sans-serif;
+  --prose-heading: #ffffff; --prose-link: #ff5a4f; --prose-code-bg: #161618;
+  --prose-max-width: 700px; --prose-line-height: 1.72;
+  --code-keyword: #ff5a4f; --code-string: #b8b8c0; --code-comment: #6a6a72;
+  --code-number: #d8d8de; --code-fn: #f1f1f3; --code-tag: #ff8074;
+}

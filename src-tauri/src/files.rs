@@ -29,12 +29,28 @@ pub fn parse_theme_name(css: &str) -> String {
     parse_header(css, "@name").unwrap_or_else(|| "Untitled".to_string())
 }
 
-/// Extract `/* @mermaid dark|default */`, defaulting to "default".
-pub fn parse_mermaid_mode(css: &str) -> String {
-    match parse_header(css, "@mermaid").as_deref() {
+/// Extract `/* @mode light|dark */`, defaulting to "light".
+pub fn parse_mode(css: &str) -> String {
+    match parse_header(css, "@mode").as_deref() {
         Some("dark") => "dark".to_string(),
-        _ => "default".to_string(),
+        _ => "light".to_string(),
     }
+}
+
+/// Extract a CSS custom-property value, e.g. `parse_css_var(css, "--accent")`.
+/// Returns the trimmed value (without trailing `;`) or empty string if absent.
+pub fn parse_css_var(css: &str, name: &str) -> String {
+    let needle = format!("{}:", name);
+    for line in css.lines() {
+        if let Some(idx) = line.find(&needle) {
+            let rest = &line[idx + needle.len()..];
+            let val = rest.split(';').next().unwrap_or("").trim();
+            if !val.is_empty() {
+                return val.to_string();
+            }
+        }
+    }
+    String::new()
 }
 
 fn parse_header(css: &str, key: &str) -> Option<String> {
@@ -73,15 +89,17 @@ mod tests {
     }
 
     #[test]
-    fn parses_theme_name_and_mermaid() {
-        let css = "/* @name Midnight */\n/* @mermaid dark */\n:root{}";
-        assert_eq!(parse_theme_name(css), "Midnight");
-        assert_eq!(parse_mermaid_mode(css), "dark");
+    fn parses_theme_name_and_mode() {
+        let css = "/* @name Aurora */\n/* @mode dark */\n:root{ --accent: #4fd1c5; }";
+        assert_eq!(parse_theme_name(css), "Aurora");
+        assert_eq!(parse_mode(css), "dark");
+        assert_eq!(parse_css_var(css, "--accent"), "#4fd1c5");
     }
 
     #[test]
     fn theme_defaults_when_absent() {
         assert_eq!(parse_theme_name(":root{}"), "Untitled");
-        assert_eq!(parse_mermaid_mode(":root{}"), "default");
+        assert_eq!(parse_mode(":root{}"), "light");
+        assert_eq!(parse_css_var(":root{}", "--accent"), "");
     }
 }

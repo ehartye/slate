@@ -1,0 +1,16 @@
+/* @name Verdant */
+/* @mode dark */
+:root {
+  --bg: #10160e; --bg-elevated: #182114; --fg: #e2ecda; --fg-muted: #8a9a80;
+  --border: #283523; --accent: #8fbf6a; --accent-soft: rgba(143, 191, 106, 0.15);
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  --ui-font: 'Constantia', 'Hoefler Text', Georgia, serif;
+  --editor-bg: #10160e; --editor-fg: #e2ecda; --editor-font: 'Consolas', ui-monospace, monospace;
+  --prose-bg: #10160e; --prose-fg: #e2ecda;
+  --prose-font: 'Constantia', 'Hoefler Text', Georgia, serif;
+  --prose-heading-font: 'Constantia', 'Hoefler Text', Georgia, serif;
+  --prose-heading: #eef6e6; --prose-link: #a3cf7d; --prose-code-bg: #1a2417;
+  --prose-max-width: 720px; --prose-line-height: 1.75;
+  --code-keyword: #a3cf7d; --code-string: #d8c07a; --code-comment: #6f8062;
+  --code-number: #e0a86a; --code-fn: #7fc89a; --code-tag: #d98a6a;
+}

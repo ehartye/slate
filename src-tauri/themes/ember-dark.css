@@ -1,0 +1,16 @@
+/* @name Ember */
+/* @mode dark */
+:root {
+  --bg: #1a1411; --bg-elevated: #241b16; --fg: #efe2d4; --fg-muted: #a89586;
+  --border: #382a22; --accent: #e8915a; --accent-soft: rgba(232, 145, 90, 0.15);
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  --ui-font: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --editor-bg: #1a1411; --editor-fg: #efe2d4; --editor-font: 'Cascadia Mono', 'Consolas', ui-monospace, monospace;
+  --prose-bg: #1a1411; --prose-fg: #efe2d4;
+  --prose-font: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --prose-heading-font: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --prose-heading: #fff2e4; --prose-link: #f0a368; --prose-code-bg: #251b15;
+  --prose-max-width: 700px; --prose-line-height: 1.78;
+  --code-keyword: #f0a35a; --code-string: #c9b36a; --code-comment: #8a7059;
+  --code-number: #e07b5a; --code-fn: #d8a978; --code-tag: #e6735a;
+}

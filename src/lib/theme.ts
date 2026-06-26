@@ -1,8 +1,11 @@
 import { invoke } from '@tauri-apps/api/core'
 
 export interface Theme {
-  name: string
+  name: string // family, e.g. "Aurora"
+  mode: 'light' | 'dark'
   mermaid: 'default' | 'dark'
+  accent: string // representative --accent, for picker swatches
+  bg: string // representative --bg, for picker swatches
   css: string
 }
 

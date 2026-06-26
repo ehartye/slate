@@ -4,15 +4,26 @@ use tauri::Manager;
 use tauri_plugin_opener::OpenerExt;
 
 const STARTER_THEMES: &[(&str, &str)] = &[
-    ("midnight.css", include_str!("../themes/midnight.css")),
-    ("paper.css", include_str!("../themes/paper.css")),
-    ("minimal.css", include_str!("../themes/minimal.css")),
+    ("aurora-dark.css", include_str!("../themes/aurora-dark.css")),
+    ("aurora-light.css", include_str!("../themes/aurora-light.css")),
+    ("ember-dark.css", include_str!("../themes/ember-dark.css")),
+    ("ember-light.css", include_str!("../themes/ember-light.css")),
+    ("verdant-dark.css", include_str!("../themes/verdant-dark.css")),
+    ("verdant-light.css", include_str!("../themes/verdant-light.css")),
+    ("noir-dark.css", include_str!("../themes/noir-dark.css")),
+    ("noir-light.css", include_str!("../themes/noir-light.css")),
 ];
+
+/// Pre-v2 starter filenames removed on seed so they don't linger alongside the new set.
+const RETIRED_STARTERS: &[&str] = &["midnight.css", "paper.css", "minimal.css"];
 
 #[derive(serde::Serialize)]
 struct ThemeInfo {
     name: String,
+    mode: String,
     mermaid: String,
+    accent: String,
+    bg: String,
     css: String,
 }
 
@@ -28,6 +39,13 @@ fn themes_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
 
 fn seed_themes(app: &tauri::AppHandle) -> Result<(), String> {
     let dir = themes_dir(app)?;
+    // Retire the old starter set so the new families aren't crowded by stale files.
+    for name in RETIRED_STARTERS {
+        let path = dir.join(name);
+        if path.exists() {
+            let _ = std::fs::remove_file(&path);
+        }
+    }
     for (name, body) in STARTER_THEMES {
         let path = dir.join(name);
         if !path.exists() {
@@ -45,9 +63,14 @@ fn list_themes(app: tauri::AppHandle) -> Result<Vec<ThemeInfo>, String> {
         let path = entry.map_err(|e| e.to_string())?.path();
         if path.extension().and_then(|e| e.to_str()) == Some("css") {
             let css = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+            let mode = files::parse_mode(&css);
+            let mermaid = if mode == "dark" { "dark" } else { "default" }.to_string();
             out.push(ThemeInfo {
                 name: files::parse_theme_name(&css),
-                mermaid: files::parse_mermaid_mode(&css),
+                mode,
+                mermaid,
+                accent: files::parse_css_var(&css, "--accent"),
+                bg: files::parse_css_var(&css, "--bg"),
                 css,
             });
         }

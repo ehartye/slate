@@ -1,0 +1,16 @@
+/* @name Aurora */
+/* @mode dark */
+:root {
+  --bg: #0b121d; --bg-elevated: #111b2b; --fg: #dce6f2; --fg-muted: #7b8aa3;
+  --border: #1d2c44; --accent: #4fd1c5; --accent-soft: rgba(79, 209, 197, 0.15);
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --ui-font: 'Bahnschrift', 'Avenir Next', 'Segoe UI', system-ui, sans-serif;
+  --editor-bg: #0b121d; --editor-fg: #dce6f2; --editor-font: 'Cascadia Code', 'Consolas', ui-monospace, monospace;
+  --prose-bg: #0b121d; --prose-fg: #dce6f2;
+  --prose-font: 'Avenir Next', 'Segoe UI', system-ui, sans-serif;
+  --prose-heading-font: 'Bahnschrift', 'Avenir Next', 'Segoe UI', sans-serif;
+  --prose-heading: #f0f6ff; --prose-link: #5ad1c8; --prose-code-bg: #14202f;
+  --prose-max-width: 760px; --prose-line-height: 1.72;
+  --code-keyword: #c2a8ff; --code-string: #7fe0c0; --code-comment: #5b6b85;
+  --code-number: #ffb27a; --code-fn: #6fb8ff; --code-tag: #ff8ab0;
+}
