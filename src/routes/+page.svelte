@@ -6,6 +6,7 @@
   import Preview from '$lib/components/Preview.svelte'
   import { onMount } from 'svelte'
   import { invoke } from '@tauri-apps/api/core'
+  import { listen } from '@tauri-apps/api/event'
   import {
     content, currentFile, currentFolder, files, dirty, statusMsg, editorScroll,
     sidebarCollapsed, editorCollapsed, previewCollapsed,
@@ -22,16 +23,8 @@
   let previewPane = $state<HTMLElement>()
   let editorFlex = $state(1)
 
-  // If Windows launched us by opening a .md file, load it (and its folder).
-  onMount(async () => {
-    let startup: string | null = null
-    try {
-      startup = await invoke<string | null>('get_startup_file')
-    } catch {
-      return // not in a Tauri context
-    }
-    if (!startup) return
-    const dir = startup.replace(/[\\/][^\\/]*$/, '')
+  async function loadFile(path: string) {
+    const dir = path.replace(/[\\/][^\\/]*$/, '')
     currentFolder.set(dir)
     try {
       files.set(await listMarkdownFiles(dir))
@@ -39,12 +32,27 @@
       statusMsg.set(`Could not list folder: ${e}`)
     }
     try {
-      content.set(await readFile(startup))
-      currentFile.set(startup)
+      content.set(await readFile(path))
+      currentFile.set(path)
       dirty.set(false)
     } catch (e) {
       statusMsg.set(`Could not open file: ${e}`)
     }
+  }
+
+  // Load a file passed on launch (Windows: CLI arg, macOS: Apple Events).
+  // Also listen for files opened while the app is already running (macOS Finder).
+  onMount(async () => {
+    let startup: string | null = null
+    try {
+      startup = await invoke<string | null>('get_startup_file')
+    } catch {
+      return // not in a Tauri context
+    }
+    if (startup) await loadFile(startup)
+
+    const unlisten = await listen<string>('open-file', (event) => loadFile(event.payload))
+    return () => unlisten()
   })
 
   function startDrag(e: MouseEvent) {
