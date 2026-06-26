@@ -11,6 +11,8 @@
   import { writeFile } from '$lib/tauri'
   import '@fontsource/press-start-2p/400.css'
   import '@fontsource/vt323/400.css'
+  import '@fontsource/ibm-plex-mono/400.css'
+  import '@fontsource/ibm-plex-mono/600.css'
   import '$lib/styles/base.css'
 
   let previewPane = $state<HTMLElement>()

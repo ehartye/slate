@@ -1,0 +1,29 @@
+/* @name Terminal */
+/* @mode dark */
+:root {
+  --bg: #0c0b08; --bg-elevated: #14110a; --fg: #f2b234; --fg-muted: #9a7a32;
+  --border: #2a2110; --accent: #ffb000; --accent-soft: rgba(255, 176, 0, 0.15);
+  --shadow: 0 0 18px rgba(255, 176, 0, 0.25);
+  --ui-font: 'IBM Plex Mono', 'Cascadia Mono', Consolas, monospace;
+  --editor-bg: #0c0b08; --editor-fg: #f2b234; --editor-font: 'IBM Plex Mono', Consolas, monospace;
+  --prose-bg: #0c0b08; --prose-fg: #ecc06a;
+  --prose-font: 'IBM Plex Mono', 'Cascadia Mono', Consolas, monospace;
+  --prose-heading-font: 'IBM Plex Mono', Consolas, monospace;
+  --prose-heading: #ffc24d; --prose-link: #ffd27a; --prose-code-bg: #17130b;
+  --prose-max-width: 740px; --prose-line-height: 1.65;
+  --code-keyword: #ffcf4d; --code-string: #e8a13c; --code-comment: #8a6a2a;
+  --code-number: #ffb000; --code-fn: #ffd98a; --code-tag: #ff8c3a;
+}
+
+/* ── amber CRT terminal flair ── */
+.browser-btn, .mode-toggle, .mode-btn, .swatch, .sidebar li button,
+.preview pre, .preview code, .preview blockquote, .preview th, .preview td, .pane-head { border-radius: 0 !important; }
+.brand { text-shadow: 0 0 7px rgba(255, 176, 0, 0.6); }
+.brand-dot { box-shadow: 0 0 8px var(--accent), 0 0 14px var(--accent);
+  animation: termBlink 1.2s steps(2, start) infinite; }
+.preview h1, .preview h2 { text-shadow: 0 0 8px rgba(255, 176, 0, 0.4); }
+.preview a { text-shadow: 0 0 7px rgba(255, 210, 122, 0.4); }
+.cm-host .cm-cursor { border-left-color: var(--accent); }
+.app::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9000;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px 3px); opacity: 0.4; }
+@keyframes termBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
