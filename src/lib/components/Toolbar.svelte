@@ -3,49 +3,31 @@
   import { invoke } from '@tauri-apps/api/core'
   import {
     currentFile, currentFolder, content, dirty,
-    themes, activeThemeName, activeMode, activeMermaidMode,
+    themes, activeThemeName, activeMode,
     sidebarCollapsed,
   } from '$lib/stores'
   import { baseName } from '$lib/tauri'
-  import { listThemes, applyTheme, type Theme } from '$lib/theme'
+  import { listThemes, applyThemeVariant, savedThemeChoice, type Theme } from '$lib/theme'
   import { renderMarkdown } from '$lib/markdown'
   import { buildStandaloneHtml } from '$lib/export'
+  import ThemePanel from './ThemePanel.svelte'
 
-  function uniqueFamilies(list: Theme[]): string[] {
-    const seen = new Set<string>()
-    const out: string[] = []
-    for (const t of list) if (!seen.has(t.name)) { seen.add(t.name); out.push(t.name) }
-    return out
-  }
+  let panelOpen = $state(false)
 
-  let families = $derived(uniqueFamilies($themes))
-
-  function variant(family: string, mode: 'light' | 'dark'): Theme | undefined {
-    return $themes.find((t) => t.name === family && t.mode === mode)
-  }
-
-  function apply(t: Theme) {
-    applyTheme(t.css)
-    activeThemeName.set(t.name)
-    activeMode.set(t.mode)
-    activeMermaidMode.set(t.mermaid)
-  }
-
-  function selectFamily(family: string) {
-    const t = variant(family, $activeMode) ?? $themes.find((x) => x.name === family)
-    if (t) apply(t)
-  }
-
-  function setMode(mode: 'light' | 'dark') {
-    const t = variant($activeThemeName ?? '', mode) ?? $themes.find((x) => x.mode === mode)
-    if (t) apply(t)
-  }
+  // Current theme variant (for the toolbar button's swatch + label).
+  let current = $derived(
+    $themes.find((t) => t.name === $activeThemeName && t.mode === $activeMode),
+  )
 
   onMount(async () => {
     const loaded = await listThemes()
     themes.set(loaded)
-    const def = loaded.find((t) => t.name === 'Aurora' && t.mode === 'dark') ?? loaded[0]
-    if (def) apply(def)
+    const saved = savedThemeChoice()
+    const pick =
+      (saved && loaded.find((t) => t.name === saved.name && t.mode === saved.mode)) ??
+      loaded.find((t) => t.name === 'Aurora' && t.mode === 'dark') ??
+      loaded[0]
+    if (pick) applyThemeVariant(pick)
   })
 
   async function openInBrowser() {
@@ -79,23 +61,21 @@
     Open in browser <span class="arrow">↗</span>
   </button>
 
-  <div class="theme-picker">
-    <div class="mode-toggle" role="group" aria-label="Light or dark mode">
-      <button class="mode-btn" class:active={$activeMode === 'light'} onclick={() => setMode('light')} title="Light" aria-label="Light mode">☀</button>
-      <button class="mode-btn" class:active={$activeMode === 'dark'} onclick={() => setMode('dark')} title="Dark" aria-label="Dark mode">☾</button>
-    </div>
-    <div class="swatches">
-      {#each families as fam (fam)}
-        {@const v = variant(fam, $activeMode)}
-        <button
-          class="swatch"
-          class:active={$activeThemeName === fam}
-          style="--sw-bg:{v?.bg ?? '#888'}; --sw-accent:{v?.accent ?? '#888'}"
-          onclick={() => selectFamily(fam)}
-          title={fam}
-          aria-label={`${fam} theme`}
-        ></button>
-      {/each}
-    </div>
-  </div>
+  <button
+    class="theme-open-btn"
+    class:active={panelOpen}
+    onclick={() => (panelOpen = !panelOpen)}
+    title="Choose a theme"
+  >
+    <span
+      class="tb-swatch"
+      style="--sw-bg:{current?.bg ?? '#888'}; --sw-accent:{current?.accent ?? '#888'}"
+    ></span>
+    <span class="tb-label">{$activeThemeName ?? 'Theme'} · {$activeMode}</span>
+    <span class="tb-caret">▾</span>
+  </button>
 </header>
+
+{#if panelOpen}
+  <ThemePanel onclose={() => (panelOpen = false)} />
+{/if}
