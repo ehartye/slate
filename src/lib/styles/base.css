@@ -30,4 +30,8 @@ body { font-family: system-ui, sans-serif; color: var(--fg); background: var(--b
 .editor-pane { background: var(--editor-bg); }
 .cm-host, .cm-host .cm-editor { height: 100%; }
 .cm-host .cm-scroller { font-family: var(--editor-font); font-size: 14px; color: var(--editor-fg); }
-.preview-pane { border-left: 1px solid var(--border); padding: 12px; }
+.split { flex: 1; display: flex; min-width: 0; }
+.divider { width: 6px; cursor: col-resize; background: var(--border); flex: 0 0 auto; }
+.preview-pane { flex: 1; border-left: 1px solid var(--border); padding: 12px; }
+.preview { max-width: 100%; }
+.preview pre { overflow: auto; }
