@@ -21,9 +21,13 @@
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-opener": "^2",
+    "@vscode/markdown-it-katex": "^1.1.2",
     "codemirror": "^6.0.2",
+    "highlight.js": "^11.11.1",
+    "katex": "^0.17.0",
     "markdown-it": "^14.2.0",
-    "markdown-it-task-lists": "^2.1.1"
+    "markdown-it-task-lists": "^2.1.1",
+    "mermaid": "^11.16.0"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.6",
