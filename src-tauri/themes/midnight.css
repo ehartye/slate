@@ -1,0 +1,12 @@
+/* @name Midnight */
+/* @mermaid dark */
+:root {
+  --bg: #1b1d23; --bg-elevated: #23262e; --fg: #e7e9ee; --fg-muted: #9aa0ad;
+  --border: #323641; --accent: #7aa2f7;
+  --editor-bg: #1b1d23; --editor-fg: #e7e9ee; --editor-font: ui-monospace, monospace;
+  --prose-bg: #1b1d23; --prose-fg: #e7e9ee; --prose-font: system-ui, sans-serif;
+  --prose-heading: #ffffff; --prose-link: #7aa2f7; --prose-code-bg: #2a2e38;
+  --prose-max-width: 760px; --prose-line-height: 1.7;
+  --code-keyword: #bb9af7; --code-string: #9ece6a; --code-comment: #565f89;
+  --code-number: #ff9e64; --code-fn: #7aa2f7; --code-tag: #f7768e;
+}

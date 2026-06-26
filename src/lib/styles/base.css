@@ -32,6 +32,21 @@ body { font-family: system-ui, sans-serif; color: var(--fg); background: var(--b
 .cm-host .cm-scroller { font-family: var(--editor-font); font-size: 14px; color: var(--editor-fg); }
 .split { flex: 1; display: flex; min-width: 0; }
 .divider { width: 6px; cursor: col-resize; background: var(--border); flex: 0 0 auto; }
-.preview-pane { flex: 1; border-left: 1px solid var(--border); padding: 12px; }
-.preview { max-width: 100%; }
-.preview pre { overflow: auto; }
+.preview-pane { flex: 1; border-left: 1px solid var(--border); padding: 12px; background: var(--prose-bg); }
+.preview { color: var(--prose-fg); font-family: var(--prose-font);
+  max-width: var(--prose-max-width); margin: 0 auto; line-height: var(--prose-line-height); }
+.preview h1, .preview h2, .preview h3, .preview h4 { color: var(--prose-heading); }
+.preview a { color: var(--prose-link); }
+.preview code { background: var(--prose-code-bg); padding: 0.1em 0.3em; border-radius: 4px; }
+.preview pre.hljs, .preview pre code { background: var(--prose-code-bg); }
+.preview pre { padding: 12px; border-radius: 6px; overflow: auto; }
+/* highlight.js token colors driven by the active theme's --code-* variables */
+.preview .hljs-keyword, .preview .hljs-built_in, .preview .hljs-type { color: var(--code-keyword); }
+.preview .hljs-string, .preview .hljs-attr, .preview .hljs-meta-string { color: var(--code-string); }
+.preview .hljs-comment, .preview .hljs-quote { color: var(--code-comment); font-style: italic; }
+.preview .hljs-number, .preview .hljs-literal { color: var(--code-number); }
+.preview .hljs-title, .preview .hljs-title.function_, .preview .hljs-section { color: var(--code-fn); }
+.preview .hljs-name, .preview .hljs-tag, .preview .hljs-attribute { color: var(--code-tag); }
+/* caret/selection follow the editor colors so they stay visible on any theme */
+.cm-host .cm-cursor { border-left-color: var(--editor-fg); }
+.cm-host .cm-selectionBackground, .cm-host.cm-focused .cm-selectionBackground { background: var(--accent); opacity: 0.25; }
