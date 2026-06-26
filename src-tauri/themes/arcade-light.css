@@ -1,0 +1,35 @@
+/* @name Arcade */
+/* @mode light */
+:root {
+  --bg: #9bbc0f; --bg-elevated: #8bac0f; --fg: #0f380f; --fg-muted: #326132;
+  --border: #5a7a14; --accent: #0f380f; --accent-soft: rgba(15, 56, 15, 0.18);
+  --shadow: 0 4px 0 rgba(15, 56, 15, 0.25);
+  --ui-font: 'VT323', 'Consolas', monospace;
+  --editor-bg: #9bbc0f; --editor-fg: #0f380f; --editor-font: 'VT323', 'Consolas', monospace;
+  --prose-bg: #9bbc0f; --prose-fg: #0f380f;
+  --prose-font: 'VT323', 'Consolas', monospace;
+  --prose-heading-font: 'Press Start 2P', 'VT323', monospace;
+  --prose-heading: #0f380f; --prose-link: #1f5a1f; --prose-code-bg: #8bac0f;
+  --prose-max-width: 700px; --prose-line-height: 1.5;
+  --code-keyword: #0f380f; --code-string: #306230; --code-comment: #6e7a2e;
+  --code-number: #0f380f; --code-fn: #306230; --code-tag: #1f4a1f;
+}
+
+/* ── Game Boy DMG flair (active only while Arcade is selected) ── */
+.browser-btn, .mode-toggle, .mode-btn, .swatch, .sidebar li button,
+.preview pre, .preview code, .preview blockquote, .preview th, .preview td { border-radius: 0 !important; }
+.brand { font-family: 'Press Start 2P', 'VT323', monospace; font-size: 11px; letter-spacing: 0; }
+.file, .muted { font-size: 16px; }
+.cm-host .cm-scroller { font-size: 18px; }
+.preview { font-size: 19px; }
+.preview h1, .preview h2, .preview h3 { letter-spacing: 0; line-height: 1.6; }
+.preview h1 { font-size: 1.5em; }
+.preview h2 { font-size: 1.15em; }
+.preview h3 { font-size: 0.95em; }
+.browser-btn { box-shadow: 2px 2px 0 rgba(15, 56, 15, 0.45); }
+.browser-btn:hover { transform: translate(1px, 1px); box-shadow: 1px 1px 0 rgba(15, 56, 15, 0.45); }
+.swatch.active { box-shadow: 2px 2px 0 rgba(15, 56, 15, 0.5); }
+/* LCD pixel-dot grid overlay */
+.app::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9000;
+  background-image: radial-gradient(rgba(15, 56, 15, 0.10) 1px, transparent 1.4px);
+  background-size: 3px 3px; opacity: 0.6; }

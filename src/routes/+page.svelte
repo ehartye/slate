@@ -6,6 +6,8 @@
   import Preview from '$lib/components/Preview.svelte'
   import { content, currentFile, dirty, statusMsg, editorScroll } from '$lib/stores'
   import { writeFile } from '$lib/tauri'
+  import '@fontsource/press-start-2p/400.css'
+  import '@fontsource/vt323/400.css'
   import '$lib/styles/base.css'
 
   let previewPane: HTMLElement

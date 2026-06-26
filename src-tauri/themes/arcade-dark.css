@@ -1,0 +1,40 @@
+/* @name Arcade */
+/* @mode dark */
+:root {
+  --bg: #0a0a12; --bg-elevated: #12121f; --fg: #e9f6ff; --fg-muted: #7c8db5;
+  --border: #2a2a52; --accent: #00f0ff; --accent-soft: rgba(0, 240, 255, 0.16);
+  --shadow: 0 0 20px rgba(0, 240, 255, 0.35);
+  --ui-font: 'VT323', 'Consolas', monospace;
+  --editor-bg: #0a0a12; --editor-fg: #c7f5ff; --editor-font: 'VT323', 'Consolas', monospace;
+  --prose-bg: #0a0a12; --prose-fg: #d8ecff;
+  --prose-font: 'VT323', 'Consolas', monospace;
+  --prose-heading-font: 'Press Start 2P', 'VT323', monospace;
+  --prose-heading: #ff4cf0; --prose-link: #ffe14d; --prose-code-bg: #14142a;
+  --prose-max-width: 720px; --prose-line-height: 1.5;
+  --code-keyword: #ff4cf0; --code-string: #5dff8f; --code-comment: #5566a0;
+  --code-number: #ffe14d; --code-fn: #00f0ff; --code-tag: #ff7a3d;
+}
+
+/* ── 8-bit CRT flair (active only while Arcade is selected) ── */
+.browser-btn, .mode-toggle, .mode-btn, .swatch, .sidebar li button,
+.preview pre, .preview code, .preview blockquote, .preview th, .preview td { border-radius: 0 !important; }
+.brand { font-family: 'Press Start 2P', 'VT323', monospace; font-size: 11px; letter-spacing: 0;
+  text-shadow: 0 0 8px var(--accent), 0 0 16px var(--accent); }
+.brand-dot { box-shadow: 0 0 8px var(--accent), 0 0 16px var(--accent);
+  animation: arcadeBlink 1.1s steps(2, start) infinite; }
+.file, .muted { font-size: 16px; }
+.cm-host .cm-scroller { font-size: 18px; }
+.preview { font-size: 19px; }
+.preview h1, .preview h2, .preview h3 { letter-spacing: 0; line-height: 1.6;
+  text-shadow: 0 0 10px rgba(255, 76, 240, 0.6); }
+.preview h1 { font-size: 1.5em; }
+.preview h2 { font-size: 1.15em; }
+.preview h3 { font-size: 0.95em; }
+.preview a { text-shadow: 0 0 8px rgba(255, 225, 77, 0.5); }
+.browser-btn:hover, .mode-btn.active, .swatch.active { box-shadow: 0 0 10px var(--accent); }
+.sidebar li button.active { text-shadow: 0 0 8px var(--accent); }
+.divider:hover { box-shadow: 0 0 12px var(--accent); }
+/* scanline overlay */
+.app::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9000;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px); opacity: 0.55; }
+@keyframes arcadeBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
