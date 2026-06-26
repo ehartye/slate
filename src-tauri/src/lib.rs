@@ -2,8 +2,11 @@ mod files;
 #[cfg(windows)]
 mod win_icon;
 
-use tauri::Manager;
+use std::sync::Mutex;
+use tauri::{Emitter, Manager};
 use tauri_plugin_opener::OpenerExt;
+
+struct OpenedFile(Mutex<Option<String>>);
 
 const STARTER_THEMES: &[(&str, &str)] = &[
     ("aurora-dark.css", include_str!("../themes/aurora-dark.css")),
@@ -104,9 +107,16 @@ fn read_file(path: String) -> Result<String, String> {
     std::fs::read_to_string(&path).map_err(|e| e.to_string())
 }
 
-/// The markdown file Windows passed on launch via the file association, if any.
+/// The markdown file passed on launch — via Apple Events on macOS or CLI args on Windows.
 #[tauri::command]
-fn get_startup_file() -> Option<String> {
+fn get_startup_file(state: tauri::State<OpenedFile>) -> Option<String> {
+    // macOS: file delivered via Apple Events, stored in managed state
+    if let Ok(guard) = state.0.lock() {
+        if guard.is_some() {
+            return guard.clone();
+        }
+    }
+    // Windows: file delivered as a CLI argument
     std::env::args().skip(1).find(|a| {
         let p = std::path::Path::new(a);
         p.is_file()
@@ -167,6 +177,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .manage(OpenedFile(Mutex::new(None)))
         .setup(|app| {
             seed_themes(&app.handle()).map_err(|e| e.to_string())?;
             Ok(())
@@ -181,6 +192,36 @@ pub fn run() {
             open_in_browser,
             set_window_icon
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while running tauri application")
+        .run(|app, event| {
+            // macOS delivers file-association opens via Apple Events, not CLI args.
+            // Store the path in managed state (for get_startup_file on cold launch)
+            // and emit an event (for hot launch when the app is already running).
+            #[cfg(any(target_os = "macos", target_os = "ios"))]
+            if let tauri::RunEvent::Opened { urls } = &event {
+                let path = urls.iter().find_map(|url| {
+                    url.to_file_path().ok().and_then(|p| {
+                        let ext = p
+                            .extension()
+                            .and_then(|e| e.to_str())
+                            .map(|e| e.to_ascii_lowercase())
+                            .unwrap_or_default();
+                        if p.is_file() && (ext == "md" || ext == "markdown") {
+                            Some(p.to_string_lossy().to_string())
+                        } else {
+                            None
+                        }
+                    })
+                });
+                if let Some(ref path_str) = path {
+                    if let Some(state) = app.try_state::<OpenedFile>() {
+                        if let Ok(mut guard) = state.0.lock() {
+                            *guard = Some(path_str.clone());
+                        }
+                    }
+                    let _ = app.emit("open-file", path_str.clone());
+                }
+            }
+        });
 }
