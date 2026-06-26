@@ -1,5 +1,14 @@
+!.env.example
+.DS_Store
+.env
+.env.*
 .superpowers/
-node_modules/
+/.svelte-kit
+/build
+/package
 /src-tauri/target/
 dist/
-.DS_Store
+node_modules
+node_modules/
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
