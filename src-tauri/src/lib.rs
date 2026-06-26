@@ -1,6 +1,7 @@
 mod files;
 
 use tauri::Manager;
+use tauri_plugin_opener::OpenerExt;
 
 const STARTER_THEMES: &[(&str, &str)] = &[
     ("midnight.css", include_str!("../themes/midnight.css")),
@@ -75,6 +76,17 @@ fn write_file(path: String, content: String) -> Result<(), String> {
     std::fs::write(&path, content).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn open_in_browser(app: tauri::AppHandle, html: String) -> Result<(), String> {
+    let dir = app.path().app_cache_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join("slate-preview.html");
+    std::fs::write(&path, html).map_err(|e| e.to_string())?;
+    app.opener()
+        .open_path(path.to_string_lossy().to_string(), None::<&str>)
+        .map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -88,7 +100,8 @@ pub fn run() {
             list_markdown_files,
             read_file,
             write_file,
-            list_themes
+            list_themes,
+            open_in_browser
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
