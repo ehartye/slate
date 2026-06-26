@@ -1,11 +1,31 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { get } from 'svelte/store'
-  import { EditorView, keymap } from '@codemirror/view'
+  import {
+    EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter,
+  } from '@codemirror/view'
   import { EditorState } from '@codemirror/state'
   import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
+  import { syntaxHighlighting, HighlightStyle } from '@codemirror/language'
+  import { tags as t } from '@lezer/highlight'
   import { markdown } from '@codemirror/lang-markdown'
   import { content, currentFile, dirty, editorScroll } from '$lib/stores'
+
+  // Markdown source highlighting that follows the active theme via CSS variables.
+  const mdHighlight = HighlightStyle.define([
+    { tag: t.heading, color: 'var(--prose-heading)', fontWeight: 'bold' },
+    { tag: t.strong, color: 'var(--code-tag)', fontWeight: 'bold' },
+    { tag: t.emphasis, color: 'var(--code-fn)', fontStyle: 'italic' },
+    { tag: t.strikethrough, textDecoration: 'line-through' },
+    { tag: t.link, color: 'var(--prose-link)', textDecoration: 'underline' },
+    { tag: t.url, color: 'var(--prose-link)' },
+    { tag: t.monospace, color: 'var(--code-string)' },
+    { tag: t.quote, color: 'var(--code-comment)', fontStyle: 'italic' },
+    { tag: t.list, color: 'var(--accent)' },
+    { tag: t.contentSeparator, color: 'var(--fg-muted)' },
+    { tag: t.processingInstruction, color: 'var(--fg-muted)' },
+    { tag: t.meta, color: 'var(--fg-muted)' },
+  ])
 
   let host: HTMLDivElement
   let view: EditorView | null = null
@@ -17,9 +37,13 @@
       state: EditorState.create({
         doc: get(content),
         extensions: [
+          lineNumbers(),
+          highlightActiveLine(),
+          highlightActiveLineGutter(),
           history(),
           keymap.of([...defaultKeymap, ...historyKeymap]),
           markdown(),
+          syntaxHighlighting(mdHighlight),
           EditorView.lineWrapping,
           EditorView.updateListener.of((u) => {
             if (u.docChanged) {

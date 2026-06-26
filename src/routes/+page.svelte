@@ -4,13 +4,16 @@
   import StatusBar from '$lib/components/StatusBar.svelte'
   import Editor from '$lib/components/Editor.svelte'
   import Preview from '$lib/components/Preview.svelte'
-  import { content, currentFile, dirty, statusMsg, editorScroll } from '$lib/stores'
+  import {
+    content, currentFile, dirty, statusMsg, editorScroll,
+    sidebarCollapsed, editorCollapsed, previewCollapsed,
+  } from '$lib/stores'
   import { writeFile } from '$lib/tauri'
   import '@fontsource/press-start-2p/400.css'
   import '@fontsource/vt323/400.css'
   import '$lib/styles/base.css'
 
-  let previewPane: HTMLElement
+  let previewPane = $state<HTMLElement>()
   let editorFlex = $state(1)
 
   function startDrag(e: MouseEvent) {
@@ -73,14 +76,46 @@
 <div class="app">
   <Toolbar />
   <div class="body">
-    <Sidebar />
+    {#if !$sidebarCollapsed}<Sidebar />{/if}
     <div class="split">
-      <main class="editor-pane" style="flex:{editorFlex}">
-        {#if $currentFile}<Editor />{:else}<div class="empty">Choose a folder, then pick a file to edit.</div>{/if}
-      </main>
-      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-      <div class="divider" onmousedown={startDrag} role="separator" aria-orientation="vertical" aria-label="Resize editor and preview"></div>
-      <section class="preview-pane" bind:this={previewPane}><Preview /></section>
+      {#if $editorCollapsed}
+        <button class="rail" onclick={() => editorCollapsed.set(false)} title="Expand editor">
+          <span class="rail-icon">›</span><span class="rail-label">Editor</span>
+        </button>
+      {:else}
+        <main class="editor-pane pane" style="flex:{$previewCollapsed ? 1 : editorFlex}">
+          <div class="pane-head">
+            <span class="label">Editor</span>
+            {#if !$previewCollapsed}
+              <button class="collapse-btn" onclick={() => editorCollapsed.set(true)} title="Collapse editor">‹</button>
+            {/if}
+          </div>
+          <div class="pane-content">
+            {#if $currentFile}<Editor />{:else}<div class="empty">Choose a folder, then pick a file to edit.</div>{/if}
+          </div>
+        </main>
+      {/if}
+
+      {#if !$editorCollapsed && !$previewCollapsed}
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <div class="divider" onmousedown={startDrag} role="separator" aria-orientation="vertical" aria-label="Resize editor and preview"></div>
+      {/if}
+
+      {#if $previewCollapsed}
+        <button class="rail right" onclick={() => previewCollapsed.set(false)} title="Expand preview">
+          <span class="rail-icon">‹</span><span class="rail-label">Preview</span>
+        </button>
+      {:else}
+        <section class="preview-pane pane" style="flex:{$editorCollapsed ? 1 : 1}">
+          <div class="pane-head">
+            <span class="label">Preview</span>
+            {#if !$editorCollapsed}
+              <button class="collapse-btn" onclick={() => previewCollapsed.set(true)} title="Collapse preview">›</button>
+            {/if}
+          </div>
+          <div class="pane-content preview-scroll" bind:this={previewPane}><Preview /></div>
+        </section>
+      {/if}
     </div>
   </div>
   <StatusBar />

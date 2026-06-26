@@ -4,6 +4,7 @@
   import {
     currentFile, currentFolder, content, dirty,
     themes, activeThemeName, activeMode, activeMermaidMode,
+    sidebarCollapsed,
   } from '$lib/stores'
   import { baseName } from '$lib/tauri'
   import { listThemes, applyTheme, type Theme } from '$lib/theme'
@@ -59,6 +60,13 @@
 </script>
 
 <header class="toolbar">
+  <button
+    class="icon-btn sidebar-toggle"
+    class:off={$sidebarCollapsed}
+    onclick={() => sidebarCollapsed.update((v) => !v)}
+    title={$sidebarCollapsed ? 'Show file browser' : 'Hide file browser'}
+    aria-label="Toggle file browser"
+  >▐</button>
   <span class="brand"><span class="brand-dot"></span>Slate</span>
   {#if $currentFile}
     <span class="file">{baseName($currentFile)}{#if $dirty}<span class="file-dot" title="Unsaved"></span>{/if}</span>

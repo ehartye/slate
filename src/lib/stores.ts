@@ -9,6 +9,11 @@ export const dirty = writable<boolean>(false)
 export const statusMsg = writable<string>('')         // transient errors/info
 export const editorScroll = writable<number>(0)       // 0..1 scroll fraction, for preview sync
 
+// Layout collapse state
+export const sidebarCollapsed = writable<boolean>(false)
+export const editorCollapsed = writable<boolean>(false)
+export const previewCollapsed = writable<boolean>(false)
+
 // Theme state
 export const themes = writable<Theme[]>([])
 export const activeThemeName = writable<string | null>(null) // active family
