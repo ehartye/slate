@@ -1,0 +1,16 @@
+/* @name BucketHub */
+/* @mode dark */
+:root {
+  --bg: #0d1117; --bg-elevated: #161b22; --fg: #c9d1d9; --fg-muted: #8b949e;
+  --border: #30363d; --accent: #2f81f7; --accent-soft: rgba(47, 129, 247, 0.12);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --ui-font: ui-monospace, 'SFMono-Regular', 'Cascadia Mono', Consolas, 'Liberation Mono', monospace;
+  --editor-bg: #0d1117; --editor-fg: #c9d1d9; --editor-font: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  --prose-bg: #0d1117; --prose-fg: #c9d1d9;
+  --prose-font: ui-monospace, 'SFMono-Regular', 'Cascadia Mono', Consolas, 'Liberation Mono', monospace;
+  --prose-heading-font: ui-monospace, 'SFMono-Regular', 'Cascadia Mono', Consolas, monospace;
+  --prose-heading: #e6edf3; --prose-link: #2f81f7; --prose-code-bg: #161b22;
+  --prose-max-width: 780px; --prose-line-height: 1.6;
+  --code-keyword: #ff7b72; --code-string: #a5d6ff; --code-comment: #8b949e;
+  --code-number: #79c0ff; --code-fn: #d2a8ff; --code-tag: #7ee787;
+}

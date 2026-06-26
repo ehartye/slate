@@ -12,6 +12,7 @@
     Arcade: { emoji: '👾', blurb: 'Neon cabinet by night, Game Boy by day.' },
     Terminal: { emoji: '🖥️', blurb: 'Amber phosphor. Hack the mainframe.' },
     Overlord: { emoji: '💼', blurb: 'Tasteful thickness. Bone stock, blood-red power tie.' },
+    BucketHub: { emoji: '🪣', blurb: 'Vanilla repository. Monospace, no nonsense. The no-theme theme.' },
   }
   const MODES: Array<'light' | 'dark'> = ['light', 'dark']
 

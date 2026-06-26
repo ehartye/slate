@@ -18,6 +18,8 @@ const STARTER_THEMES: &[(&str, &str)] = &[
     ("terminal-light.css", include_str!("../themes/terminal-light.css")),
     ("overlord-dark.css", include_str!("../themes/overlord-dark.css")),
     ("overlord-light.css", include_str!("../themes/overlord-light.css")),
+    ("buckethub-dark.css", include_str!("../themes/buckethub-dark.css")),
+    ("buckethub-light.css", include_str!("../themes/buckethub-light.css")),
 ];
 
 /// Pre-v2 starter filenames removed on seed so they don't linger alongside the new set.
