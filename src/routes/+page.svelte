@@ -63,9 +63,9 @@
     }
     if (startup) await loadFile(startup)
 
-    const unlistenOpenFile = await listen<string>('open-file', (event) => loadFile(event.payload))
+    const unlisten = await listen<string>('open-file', (event) => loadFile(event.payload))
 
-    const unlistenFileChanged = await listen<string>('file-changed', async (event) => {
+    const unlistenChanged = await listen<string>('file-changed', async (event) => {
       if (suppressNextChange) { suppressNextChange = false; return }
       if ($dirty) {
         statusMsg.set('File changed on disk — save or discard changes to reload')
@@ -80,7 +80,7 @@
       }
     })
 
-    return () => { unlistenOpenFile(); unlistenFileChanged() }
+    return () => { unlisten(); unlistenChanged() }
   })
 
   function startDrag(e: MouseEvent) {
