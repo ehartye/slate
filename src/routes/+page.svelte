@@ -4,11 +4,13 @@
   import StatusBar from '$lib/components/StatusBar.svelte'
   import Editor from '$lib/components/Editor.svelte'
   import Preview from '$lib/components/Preview.svelte'
+  import { onMount } from 'svelte'
+  import { invoke } from '@tauri-apps/api/core'
   import {
-    content, currentFile, dirty, statusMsg, editorScroll,
+    content, currentFile, currentFolder, files, dirty, statusMsg, editorScroll,
     sidebarCollapsed, editorCollapsed, previewCollapsed,
   } from '$lib/stores'
-  import { writeFile } from '$lib/tauri'
+  import { writeFile, listMarkdownFiles, readFile } from '$lib/tauri'
   import '@fontsource/press-start-2p/400.css'
   import '@fontsource/vt323/400.css'
   import '@fontsource/ibm-plex-mono/400.css'
@@ -19,6 +21,31 @@
 
   let previewPane = $state<HTMLElement>()
   let editorFlex = $state(1)
+
+  // If Windows launched us by opening a .md file, load it (and its folder).
+  onMount(async () => {
+    let startup: string | null = null
+    try {
+      startup = await invoke<string | null>('get_startup_file')
+    } catch {
+      return // not in a Tauri context
+    }
+    if (!startup) return
+    const dir = startup.replace(/[\\/][^\\/]*$/, '')
+    currentFolder.set(dir)
+    try {
+      files.set(await listMarkdownFiles(dir))
+    } catch (e) {
+      statusMsg.set(`Could not list folder: ${e}`)
+    }
+    try {
+      content.set(await readFile(startup))
+      currentFile.set(startup)
+      dirty.set(false)
+    } catch (e) {
+      statusMsg.set(`Could not open file: ${e}`)
+    }
+  })
 
   function startDrag(e: MouseEvent) {
     e.preventDefault()

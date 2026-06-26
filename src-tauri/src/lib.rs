@@ -102,6 +102,22 @@ fn read_file(path: String) -> Result<String, String> {
     std::fs::read_to_string(&path).map_err(|e| e.to_string())
 }
 
+/// The markdown file Windows passed on launch via the file association, if any.
+#[tauri::command]
+fn get_startup_file() -> Option<String> {
+    std::env::args().skip(1).find(|a| {
+        let p = std::path::Path::new(a);
+        p.is_file()
+            && p.extension()
+                .and_then(|e| e.to_str())
+                .map(|e| {
+                    let e = e.to_ascii_lowercase();
+                    e == "md" || e == "markdown"
+                })
+                .unwrap_or(false)
+    })
+}
+
 #[tauri::command]
 fn write_file(path: String, content: String) -> Result<(), String> {
     std::fs::write(&path, content).map_err(|e| e.to_string())
@@ -142,6 +158,7 @@ pub fn run() {
             list_markdown_files,
             read_file,
             write_file,
+            get_startup_file,
             list_themes,
             open_in_browser,
             set_window_icon
