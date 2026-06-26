@@ -11,6 +11,7 @@
     Noir: { emoji: '🎞️', blurb: 'Editorial black & white, one red cut.' },
     Arcade: { emoji: '👾', blurb: 'Neon cabinet by night, Game Boy by day.' },
     Terminal: { emoji: '🖥️', blurb: 'Amber phosphor. Hack the mainframe.' },
+    Overlord: { emoji: '💼', blurb: 'Tasteful thickness. Bone stock, blood-red power tie.' },
   }
   const MODES: Array<'light' | 'dark'> = ['light', 'dark']
 

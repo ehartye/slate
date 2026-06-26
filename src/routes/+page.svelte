@@ -13,6 +13,8 @@
   import '@fontsource/vt323/400.css'
   import '@fontsource/ibm-plex-mono/400.css'
   import '@fontsource/ibm-plex-mono/600.css'
+  import '@fontsource/eb-garamond/400.css'
+  import '@fontsource/eb-garamond/600.css'
   import '$lib/styles/base.css'
 
   let previewPane = $state<HTMLElement>()

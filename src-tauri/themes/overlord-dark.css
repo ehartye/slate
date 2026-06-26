@@ -1,0 +1,23 @@
+/* @name Overlord */
+/* @mode dark */
+:root {
+  --bg: #0e0e0f; --bg-elevated: #16161a; --fg: #e9e6df; --fg-muted: #8e897e;
+  --border: #26262b; --accent: #b03434; --accent-soft: rgba(176, 52, 52, 0.14);
+  --shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
+  --ui-font: 'EB Garamond', Georgia, serif;
+  --editor-bg: #0e0e0f; --editor-fg: #e9e6df; --editor-font: 'Cascadia Mono', 'Consolas', ui-monospace, monospace;
+  --prose-bg: #0e0e0f; --prose-fg: #e4e0d7;
+  --prose-font: 'EB Garamond', Georgia, serif;
+  --prose-heading-font: 'EB Garamond', Georgia, serif;
+  --prose-heading: #faf8f2; --prose-link: #c84a4a; --prose-code-bg: #1a1a1e;
+  --prose-max-width: 720px; --prose-line-height: 1.7;
+  --code-keyword: #c84a4a; --code-string: #b8b2a0; --code-comment: #6a675e;
+  --code-number: #d8d4c8; --code-fn: #e9e6df; --code-tag: #d05a5a;
+}
+
+/* ── corporate business-card flair ── */
+.browser-btn, .theme-open-btn, .sidebar li button, .pane-head, .theme-card, .thumb-mock,
+.preview pre, .preview code, .preview blockquote, .preview th, .preview td { border-radius: 0 !important; }
+.brand { letter-spacing: 0.22em; font-weight: 600; }
+.preview { font-size: 17px; }
+.preview h1, .preview h2, .preview h3 { text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600; }
