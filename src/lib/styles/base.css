@@ -50,3 +50,10 @@ body { font-family: system-ui, sans-serif; color: var(--fg); background: var(--b
 /* caret/selection follow the editor colors so they stay visible on any theme */
 .cm-host .cm-cursor { border-left-color: var(--editor-fg); }
 .cm-host .cm-selectionBackground, .cm-host.cm-focused .cm-selectionBackground { background: var(--accent); opacity: 0.25; }
+/* polish */
+.empty { padding: 24px; color: var(--fg-muted); }
+.statusbar .msg { color: #d9954a; }
+.statusbar .hint { color: var(--fg-muted); }
+.toolbar .browser-btn, .toolbar select { background: var(--bg); color: var(--fg);
+  border: 1px solid var(--border); border-radius: 5px; padding: 3px 8px; cursor: pointer; }
+.toolbar .theme-label { display: inline-flex; gap: 6px; align-items: center; color: var(--fg-muted); }

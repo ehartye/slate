@@ -34,9 +34,21 @@
     previewPane.scrollTop = frac * (previewPane.scrollHeight - previewPane.clientHeight)
   })
 
+  // Auto-clear transient status messages after 4s.
+  let statusTimer: ReturnType<typeof setTimeout> | null = null
+  $effect(() => {
+    if ($statusMsg) {
+      if (statusTimer) clearTimeout(statusTimer)
+      statusTimer = setTimeout(() => statusMsg.set(''), 4000)
+    }
+  })
+
   async function save() {
     const path = $currentFile
-    if (!path) return
+    if (!path) {
+      statusMsg.set('Open a file before saving')
+      return
+    }
     try {
       await writeFile(path, $content)
       dirty.set(false)
@@ -61,8 +73,11 @@
   <div class="body">
     <Sidebar />
     <div class="split">
-      <main class="editor-pane" style="flex:{editorFlex}"><Editor /></main>
-      <div class="divider" onmousedown={startDrag} role="separator" aria-orientation="vertical"></div>
+      <main class="editor-pane" style="flex:{editorFlex}">
+        {#if $currentFile}<Editor />{:else}<div class="empty">Choose a folder, then pick a file to edit.</div>{/if}
+      </main>
+      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+      <div class="divider" onmousedown={startDrag} role="separator" aria-orientation="vertical" aria-label="Resize editor and preview"></div>
       <section class="preview-pane" bind:this={previewPane}><Preview /></section>
     </div>
   </div>
