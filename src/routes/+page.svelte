@@ -2,14 +2,10 @@
   import Toolbar from '$lib/components/Toolbar.svelte'
   import Sidebar from '$lib/components/Sidebar.svelte'
   import StatusBar from '$lib/components/StatusBar.svelte'
+  import Editor from '$lib/components/Editor.svelte'
   import { content, currentFile, dirty, statusMsg } from '$lib/stores'
   import { writeFile } from '$lib/tauri'
   import '$lib/styles/base.css'
-
-  function onInput(e: Event) {
-    content.set((e.target as HTMLTextAreaElement).value)
-    dirty.set(true)
-  }
 
   async function save() {
     const path = $currentFile
@@ -37,9 +33,7 @@
   <Toolbar />
   <div class="body">
     <Sidebar />
-    <main class="editor-pane">
-      <textarea value={$content} oninput={onInput}></textarea>
-    </main>
+    <main class="editor-pane"><Editor /></main>
     <section class="preview-pane"><pre>{$content}</pre></section>
   </div>
   <StatusBar />
