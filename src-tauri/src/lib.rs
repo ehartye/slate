@@ -106,6 +106,17 @@ fn write_file(path: String, content: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn set_window_icon(
+    window: tauri::Window,
+    rgba: Vec<u8>,
+    width: u32,
+    height: u32,
+) -> Result<(), String> {
+    let icon = tauri::image::Image::new_owned(rgba, width, height);
+    window.set_icon(icon).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn open_in_browser(app: tauri::AppHandle, html: String) -> Result<(), String> {
     let dir = app.path().app_cache_dir().map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
@@ -130,7 +141,8 @@ pub fn run() {
             read_file,
             write_file,
             list_themes,
-            open_in_browser
+            open_in_browser,
+            set_window_icon
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import { activeThemeName, activeMode, activeMermaidMode } from './stores'
+import { updateAppIcon } from './icon'
 
 export interface Theme {
   name: string // family, e.g. "Aurora"
@@ -36,6 +37,7 @@ export function applyThemeVariant(t: Theme): void {
   } catch {
     /* localStorage unavailable — non-fatal */
   }
+  void updateAppIcon({ bg: t.bg, accent: t.accent, font: cssVar(t.css, '--prose-heading-font') })
 }
 
 /** The remembered { name, mode } selection, or null if none/unreadable. */
