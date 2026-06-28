@@ -8,9 +8,10 @@
   import { invoke } from '@tauri-apps/api/core'
   import {
     content, currentFile, currentFolder, files, dirty, statusMsg, editorScroll,
-    sidebarCollapsed, editorCollapsed, previewCollapsed,
+    sidebarCollapsed, editorCollapsed, previewCollapsed, previewZoom,
   } from '$lib/stores'
   import { writeFile, listMarkdownFiles, readFile } from '$lib/tauri'
+  import { loadZoom, setZoom, nudgeZoom } from '$lib/zoom'
   import '@fontsource/press-start-2p/400.css'
   import '@fontsource/vt323/400.css'
   import '@fontsource/ibm-plex-mono/400.css'
@@ -21,6 +22,9 @@
 
   let previewPane = $state<HTMLElement>()
   let editorFlex = $state(1)
+
+  // Restore the remembered preview zoom.
+  previewZoom.set(loadZoom())
 
   // If Windows launched us by opening a .md file, load it (and its folder).
   onMount(async () => {
@@ -95,9 +99,19 @@
   }
 
   function onKeydown(e: KeyboardEvent) {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+    if (!(e.ctrlKey || e.metaKey)) return
+    if (e.key.toLowerCase() === 's') {
       e.preventDefault()
       save()
+    } else if (e.key === '=' || e.key === '+') {
+      e.preventDefault()
+      nudgeZoom(1)
+    } else if (e.key === '-' || e.key === '_') {
+      e.preventDefault()
+      nudgeZoom(-1)
+    } else if (e.key === '0') {
+      e.preventDefault()
+      setZoom(1)
     }
   }
 </script>

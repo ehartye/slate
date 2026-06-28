@@ -118,6 +118,14 @@ fn get_startup_file() -> Option<String> {
     })
 }
 
+/// Resolve a relative link in `base` (the current markdown file) to an absolute
+/// path, returning it only if it points at an existing `.md`/`.markdown` file.
+#[tauri::command]
+fn resolve_md_link(base: String, href: String) -> Option<String> {
+    files::resolve_md_link(std::path::Path::new(&base), &href)
+        .map(|p| p.to_string_lossy().to_string())
+}
+
 #[tauri::command]
 fn write_file(path: String, content: String) -> Result<(), String> {
     std::fs::write(&path, content).map_err(|e| e.to_string())
@@ -158,6 +166,7 @@ pub fn run() {
             list_markdown_files,
             read_file,
             write_file,
+            resolve_md_link,
             get_startup_file,
             list_themes,
             open_in_browser,

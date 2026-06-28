@@ -202,3 +202,10 @@ body { font-family: var(--ui-font); color: var(--fg); background: var(--bg); }
 .statusbar .unsaved { color: var(--accent); }
 .statusbar .msg { color: var(--accent); }
 .statusbar .hint { color: var(--fg-muted); }
+.statusbar .zoom { display: inline-flex; align-items: center; gap: 2px; }
+.statusbar .zoom-btn, .statusbar .zoom-level {
+  background: none; border: 1px solid var(--border); color: var(--fg-muted);
+  font: inherit; cursor: pointer; border-radius: 5px; padding: 1px 6px; line-height: 1.4;
+}
+.statusbar .zoom-level { min-width: 42px; text-align: center; border-color: transparent; }
+.statusbar .zoom-btn:hover, .statusbar .zoom-level:hover { color: var(--fg); border-color: var(--accent); }
