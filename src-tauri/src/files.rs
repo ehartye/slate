@@ -24,6 +24,45 @@ pub fn markdown_files_in(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
     Ok(out)
 }
 
+/// Resolve a relative link `href` (from a markdown file at `base_file`) to an
+/// absolute path, but only if it points at an existing `.md`/`.markdown` file.
+/// Returns `None` for missing files, non-markdown targets, or absolute/URL hrefs.
+pub fn resolve_md_link(base_file: &Path, href: &str) -> Option<PathBuf> {
+    let parent = base_file.parent()?;
+    let joined = parent.join(href);
+    let resolved = strip_verbatim(joined.canonicalize().ok()?);
+    if !resolved.is_file() {
+        return None;
+    }
+    let is_md = resolved
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| {
+            let e = e.to_ascii_lowercase();
+            e == "md" || e == "markdown"
+        })
+        .unwrap_or(false);
+    if is_md {
+        Some(resolved)
+    } else {
+        None
+    }
+}
+
+/// Drop Windows' `\\?\` extended-length / verbatim prefix so the result matches
+/// the plain `C:\...` paths used elsewhere in the app. No-op on other platforms
+/// and for paths without the prefix.
+fn strip_verbatim(p: PathBuf) -> PathBuf {
+    let s = p.to_string_lossy();
+    if let Some(rest) = s.strip_prefix(r"\\?\UNC\") {
+        return PathBuf::from(format!(r"\\{}", rest));
+    }
+    if let Some(rest) = s.strip_prefix(r"\\?\") {
+        return PathBuf::from(rest);
+    }
+    p
+}
+
 /// Extract `/* @name X */` value, or "Untitled".
 pub fn parse_theme_name(css: &str) -> String {
     parse_header(css, "@name").unwrap_or_else(|| "Untitled".to_string())
@@ -86,6 +125,47 @@ mod tests {
             .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
             .collect();
         assert_eq!(names, vec!["a.MD", "b.md", "note.markdown"]);
+    }
+
+    #[test]
+    fn resolves_existing_sibling_md_link() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path().join("index.md");
+        fs::write(&base, "x").unwrap();
+        fs::write(dir.path().join("other.md"), "y").unwrap();
+
+        let got = resolve_md_link(&base, "other.md").unwrap();
+        let want = strip_verbatim(dir.path().join("other.md").canonicalize().unwrap());
+        assert_eq!(got, want);
+        // No verbatim prefix leaks through.
+        assert!(!got.to_string_lossy().contains(r"\\?\"));
+        // A leading ./ resolves the same way.
+        assert_eq!(resolve_md_link(&base, "./other.md").unwrap(), want);
+    }
+
+    #[test]
+    fn resolves_parent_dir_md_link() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("up.md"), "y").unwrap();
+        let sub = dir.path().join("sub");
+        fs::create_dir(&sub).unwrap();
+        let base = sub.join("index.md");
+        fs::write(&base, "x").unwrap();
+
+        let got = resolve_md_link(&base, "../up.md").unwrap();
+        let want = strip_verbatim(dir.path().join("up.md").canonicalize().unwrap());
+        assert_eq!(got, want);
+    }
+
+    #[test]
+    fn rejects_missing_and_non_markdown_links() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path().join("index.md");
+        fs::write(&base, "x").unwrap();
+        fs::write(dir.path().join("data.txt"), "y").unwrap();
+
+        assert!(resolve_md_link(&base, "nope.md").is_none());
+        assert!(resolve_md_link(&base, "data.txt").is_none());
     }
 
     #[test]

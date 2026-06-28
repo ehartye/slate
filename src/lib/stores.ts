@@ -8,6 +8,7 @@ export const content = writable<string>('')           // editor text
 export const dirty = writable<boolean>(false)
 export const statusMsg = writable<string>('')         // transient errors/info
 export const editorScroll = writable<number>(0)       // 0..1 scroll fraction, for preview sync
+export const previewZoom = writable<number>(1)        // preview render scale, persisted
 
 // Layout collapse state
 export const sidebarCollapsed = writable<boolean>(false)
