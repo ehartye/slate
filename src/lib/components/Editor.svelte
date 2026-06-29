@@ -9,7 +9,7 @@
   import { syntaxHighlighting, HighlightStyle } from '@codemirror/language'
   import { tags as t } from '@lezer/highlight'
   import { markdown } from '@codemirror/lang-markdown'
-  import { content, currentFile, dirty, editorScroll } from '$lib/stores'
+  import { content, currentFile, dirty, editorScroll, reloadTrigger } from '$lib/stores'
 
   // Markdown source highlighting that follows the active theme via CSS variables.
   const mdHighlight = HighlightStyle.define([
@@ -30,6 +30,7 @@
   let host: HTMLDivElement
   let view: EditorView | null = null
   let lastLoaded: string | null = null
+  let lastTrigger = 0
 
   onMount(() => {
     view = new EditorView({
@@ -67,11 +68,13 @@
     }
   })
 
-  // Swap the document only when the open file changes (not on every keystroke).
+  // Swap the document when the open file changes OR an external reload is triggered.
   $effect(() => {
     const file = $currentFile
-    if (!view || file === lastLoaded) return
+    const trigger = $reloadTrigger
+    if (!view || (file === lastLoaded && trigger === lastTrigger)) return
     lastLoaded = file
+    lastTrigger = trigger
     view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: get(content) } })
   })
 </script>

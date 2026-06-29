@@ -6,9 +6,10 @@
   import Preview from '$lib/components/Preview.svelte'
   import { onMount } from 'svelte'
   import { invoke } from '@tauri-apps/api/core'
+  import { listen } from '@tauri-apps/api/event'
   import {
     content, currentFile, currentFolder, files, dirty, statusMsg, editorScroll,
-    sidebarCollapsed, editorCollapsed, previewCollapsed, previewZoom,
+    sidebarCollapsed, editorCollapsed, previewCollapsed, previewZoom, reloadTrigger,
   } from '$lib/stores'
   import { writeFile, listMarkdownFiles, readFile } from '$lib/tauri'
   import { loadZoom, setZoom, nudgeZoom } from '$lib/zoom'
@@ -22,20 +23,20 @@
 
   let previewPane = $state<HTMLElement>()
   let editorFlex = $state(1)
+  let suppressNextChange = false
 
   // Restore the remembered preview zoom.
   previewZoom.set(loadZoom())
 
-  // If Windows launched us by opening a .md file, load it (and its folder).
-  onMount(async () => {
-    let startup: string | null = null
-    try {
-      startup = await invoke<string | null>('get_startup_file')
-    } catch {
-      return // not in a Tauri context
-    }
-    if (!startup) return
-    const dir = startup.replace(/[\\/][^\\/]*$/, '')
+  // Keep the file watcher in sync with whichever file is open.
+  $effect(() => {
+    const path = $currentFile
+    if (path) invoke('watch_file', { path }).catch(() => {})
+    else invoke('unwatch_file').catch(() => {})
+  })
+
+  async function loadFile(path: string) {
+    const dir = path.replace(/[\\/][^\\/]*$/, '')
     currentFolder.set(dir)
     try {
       files.set(await listMarkdownFiles(dir))
@@ -43,12 +44,43 @@
       statusMsg.set(`Could not list folder: ${e}`)
     }
     try {
-      content.set(await readFile(startup))
-      currentFile.set(startup)
+      content.set(await readFile(path))
+      currentFile.set(path)
       dirty.set(false)
     } catch (e) {
       statusMsg.set(`Could not open file: ${e}`)
     }
+  }
+
+  // Load a file passed on launch (Windows: CLI arg, macOS: Apple Events).
+  // Also listen for files opened while the app is already running (macOS Finder).
+  onMount(async () => {
+    let startup: string | null = null
+    try {
+      startup = await invoke<string | null>('get_startup_file')
+    } catch {
+      return // not in a Tauri context
+    }
+    if (startup) await loadFile(startup)
+
+    const unlisten = await listen<string>('open-file', (event) => loadFile(event.payload))
+
+    const unlistenChanged = await listen<string>('file-changed', async (event) => {
+      if (suppressNextChange) { suppressNextChange = false; return }
+      if ($dirty) {
+        statusMsg.set('File changed on disk — save or discard changes to reload')
+        return
+      }
+      try {
+        content.set(await readFile(event.payload))
+        reloadTrigger.update(n => n + 1)
+        statusMsg.set('Reloaded from disk')
+      } catch (e) {
+        statusMsg.set(`Could not reload: ${e}`)
+      }
+    })
+
+    return () => { unlisten(); unlistenChanged() }
   })
 
   function startDrag(e: MouseEvent) {
@@ -90,10 +122,12 @@
       return
     }
     try {
+      suppressNextChange = true
       await writeFile(path, $content)
       dirty.set(false)
       statusMsg.set('')
     } catch (e) {
+      suppressNextChange = false
       statusMsg.set(`Save failed: ${e}`)
     }
   }

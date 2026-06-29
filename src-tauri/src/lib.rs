@@ -1,9 +1,16 @@
 mod files;
-#[cfg(windows)]
-mod win_icon;
 
-use tauri::Manager;
+use std::sync::Mutex;
+use std::time::Duration;
+use notify_debouncer_mini::{
+    new_debouncer, notify::RecursiveMode, notify::RecommendedWatcher, DebounceEventResult,
+    Debouncer,
+};
+use tauri::{Emitter, Manager};
 use tauri_plugin_opener::OpenerExt;
+
+struct OpenedFile(Mutex<Option<String>>);
+struct FileWatcher(Mutex<Option<Debouncer<RecommendedWatcher>>>);
 
 const STARTER_THEMES: &[(&str, &str)] = &[
     ("aurora-dark.css", include_str!("../themes/aurora-dark.css")),
@@ -104,9 +111,16 @@ fn read_file(path: String) -> Result<String, String> {
     std::fs::read_to_string(&path).map_err(|e| e.to_string())
 }
 
-/// The markdown file Windows passed on launch via the file association, if any.
+/// The markdown file passed on launch — via Apple Events on macOS or CLI args on Windows.
 #[tauri::command]
-fn get_startup_file() -> Option<String> {
+fn get_startup_file(state: tauri::State<OpenedFile>) -> Option<String> {
+    // macOS: file delivered via Apple Events, stored in managed state
+    if let Ok(guard) = state.0.lock() {
+        if guard.is_some() {
+            return guard.clone();
+        }
+    }
+    // Windows: file delivered as a CLI argument
     std::env::args().skip(1).find(|a| {
         let p = std::path::Path::new(a);
         p.is_file()
@@ -120,12 +134,50 @@ fn get_startup_file() -> Option<String> {
     })
 }
 
-/// Resolve a relative link in `base` (the current markdown file) to an absolute
-/// path, returning it only if it points at an existing `.md`/`.markdown` file.
 #[tauri::command]
-fn resolve_md_link(base: String, href: String) -> Option<String> {
-    files::resolve_md_link(std::path::Path::new(&base), &href)
-        .map(|p| p.to_string_lossy().to_string())
+fn watch_file(
+    app: tauri::AppHandle,
+    state: tauri::State<FileWatcher>,
+    path: String,
+) -> Result<(), String> {
+    let file_path = std::path::PathBuf::from(&path);
+    let parent = file_path
+        .parent()
+        .ok_or_else(|| "file has no parent directory".to_string())?
+        .to_path_buf();
+
+    let app_h = app.clone();
+    let watched = path.clone();
+
+    // Watch the parent dir so atomic-rename saves (vim, VSCode, etc.) are caught.
+    let mut debouncer = new_debouncer(
+        Duration::from_millis(300),
+        move |res: DebounceEventResult| {
+            if let Ok(events) = res {
+                let matches = events.iter().any(|e| e.path == file_path);
+                if matches {
+                    let _ = app_h.emit("file-changed", watched.clone());
+                }
+            }
+        },
+    )
+    .map_err(|e| e.to_string())?;
+
+    debouncer
+        .watcher()
+        .watch(&parent, RecursiveMode::NonRecursive)
+        .map_err(|e| e.to_string())?;
+
+    let mut guard = state.0.lock().map_err(|e| e.to_string())?;
+    *guard = Some(debouncer);
+    Ok(())
+}
+
+#[tauri::command]
+fn unwatch_file(state: tauri::State<FileWatcher>) -> Result<(), String> {
+    let mut guard = state.0.lock().map_err(|e| e.to_string())?;
+    *guard = None;
+    Ok(())
 }
 
 #[tauri::command]
@@ -140,13 +192,6 @@ fn set_window_icon(
     width: u32,
     height: u32,
 ) -> Result<(), String> {
-    // ICON_BIG (taskbar / Alt-Tab) — Tauri's set_icon only covers ICON_SMALL
-    // (the title bar), so the taskbar would keep the static bundled icon.
-    #[cfg(windows)]
-    if let Ok(hwnd) = window.hwnd() {
-        win_icon::set_big_icon(hwnd, &rgba, width as i32, height as i32)?;
-    }
-    // ICON_SMALL (title bar).
     let icon = tauri::image::Image::new_owned(rgba, width, height);
     window.set_icon(icon).map_err(|e| e.to_string())
 }
@@ -167,6 +212,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .manage(OpenedFile(Mutex::new(None)))
+        .manage(FileWatcher(Mutex::new(None)))
         .setup(|app| {
             seed_themes(&app.handle()).map_err(|e| e.to_string())?;
             Ok(())
@@ -175,12 +222,43 @@ pub fn run() {
             list_markdown_files,
             read_file,
             write_file,
-            resolve_md_link,
+            watch_file,
+            unwatch_file,
             get_startup_file,
             list_themes,
             open_in_browser,
             set_window_icon
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while running tauri application")
+        .run(|app, event| {
+            // macOS delivers file-association opens via Apple Events, not CLI args.
+            // Store the path in managed state (for get_startup_file on cold launch)
+            // and emit an event (for hot launch when the app is already running).
+            #[cfg(any(target_os = "macos", target_os = "ios"))]
+            if let tauri::RunEvent::Opened { urls } = &event {
+                let path = urls.iter().find_map(|url| {
+                    url.to_file_path().ok().and_then(|p| {
+                        let ext = p
+                            .extension()
+                            .and_then(|e| e.to_str())
+                            .map(|e| e.to_ascii_lowercase())
+                            .unwrap_or_default();
+                        if p.is_file() && (ext == "md" || ext == "markdown") {
+                            Some(p.to_string_lossy().to_string())
+                        } else {
+                            None
+                        }
+                    })
+                });
+                if let Some(ref path_str) = path {
+                    if let Some(state) = app.try_state::<OpenedFile>() {
+                        if let Ok(mut guard) = state.0.lock() {
+                            *guard = Some(path_str.clone());
+                        }
+                    }
+                    let _ = app.emit("open-file", path_str.clone());
+                }
+            }
+        });
 }
