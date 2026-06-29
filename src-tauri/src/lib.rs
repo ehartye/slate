@@ -1,4 +1,6 @@
 mod files;
+#[cfg(windows)]
+mod win_icon;
 
 use tauri::Manager;
 use tauri_plugin_opener::OpenerExt;
@@ -138,6 +140,13 @@ fn set_window_icon(
     width: u32,
     height: u32,
 ) -> Result<(), String> {
+    // ICON_BIG (taskbar / Alt-Tab) — Tauri's set_icon only covers ICON_SMALL
+    // (the title bar), so the taskbar would keep the static bundled icon.
+    #[cfg(windows)]
+    if let Ok(hwnd) = window.hwnd() {
+        win_icon::set_big_icon(hwnd, &rgba, width as i32, height as i32)?;
+    }
+    // ICON_SMALL (title bar).
     let icon = tauri::image::Image::new_owned(rgba, width, height);
     window.set_icon(icon).map_err(|e| e.to_string())
 }
