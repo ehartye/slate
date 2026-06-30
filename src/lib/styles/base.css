@@ -165,7 +165,14 @@ body { font-family: var(--ui-font); color: var(--fg); background: var(--bg); }
   font-family: var(--prose-heading-font); color: var(--prose-heading); line-height: 1.25; margin: 1.6em 0 0.6em; }
 .preview h1 { font-size: 2em; letter-spacing: -0.01em; }
 .preview h2 { font-size: 1.5em; }
-.preview h3 { font-size: 1.22em; }
+/* h3 takes the theme accent so ### reads as a heading, not just bold text —
+   this is the main fix for themes where smaller headings blended into body. */
+.preview h3 { font-size: 1.3em; color: var(--accent); }
+.preview h4 { font-size: 1.12em; }
+/* h5/h6 step toward body size, so they become tracked, muted labels that stay
+   distinct from paragraph text without competing with h3/h4. */
+.preview h5 { font-size: 0.95em; text-transform: uppercase; letter-spacing: 0.07em; }
+.preview h6 { font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.08em; color: var(--fg-muted); }
 .preview h1, .preview h2 { padding-bottom: 0.25em; border-bottom: 1px solid var(--border); }
 .preview p { margin: 0.85em 0; }
 .preview a { color: var(--prose-link); text-decoration: none; border-bottom: 1px solid transparent; }
@@ -189,12 +196,22 @@ body { font-family: var(--ui-font); color: var(--fg); background: var(--bg); }
 .preview input[type=checkbox] { margin-right: 0.5em; }
 
 /* highlight.js token colors driven by the active theme's --code-* variables */
-.preview .hljs-keyword, .preview .hljs-built_in, .preview .hljs-type { color: var(--code-keyword); }
-.preview .hljs-string, .preview .hljs-attr, .preview .hljs-meta-string { color: var(--code-string); }
+.preview .hljs-keyword, .preview .hljs-built_in, .preview .hljs-type,
+.preview .hljs-selector-tag, .preview .hljs-meta-keyword { color: var(--code-keyword); }
+.preview .hljs-string, .preview .hljs-attr, .preview .hljs-meta-string, .preview .hljs-meta .hljs-string,
+.preview .hljs-regexp, .preview .hljs-selector-attr, .preview .hljs-selector-pseudo { color: var(--code-string); }
 .preview .hljs-comment, .preview .hljs-quote { color: var(--code-comment); font-style: italic; }
-.preview .hljs-number, .preview .hljs-literal { color: var(--code-number); }
-.preview .hljs-title, .preview .hljs-title.function_, .preview .hljs-section { color: var(--code-fn); }
-.preview .hljs-name, .preview .hljs-tag, .preview .hljs-attribute { color: var(--code-tag); }
+.preview .hljs-number, .preview .hljs-literal, .preview .hljs-symbol, .preview .hljs-bullet { color: var(--code-number); }
+.preview .hljs-title, .preview .hljs-title.function_, .preview .hljs-title.class_, .preview .hljs-section,
+.preview .hljs-selector-id, .preview .hljs-selector-class, .preview .hljs-property,
+.preview .hljs-meta { color: var(--code-fn); }
+.preview .hljs-name, .preview .hljs-tag, .preview .hljs-attribute,
+.preview .hljs-variable, .preview .hljs-template-variable { color: var(--code-tag); }
+.preview .hljs-emphasis { font-style: italic; }
+.preview .hljs-strong { font-weight: 700; }
+.preview .hljs-link { color: var(--prose-link); }
+.preview .hljs-deletion { color: #e5534b; }
+.preview .hljs-addition { color: #57ab5a; }
 
 /* zebra rows for long tables, theme-neutral via fg tint */
 .preview tbody tr:nth-child(even) { background: color-mix(in srgb, var(--fg) 5%, transparent); }
