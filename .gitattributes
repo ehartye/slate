@@ -1,0 +1,11 @@
+# Normalize line endings to LF in the repo and on checkout, so Windows tooling
+# (which kept rewriting Cargo.toml with CRLF) no longer churns the working tree.
+* text=auto eol=lf
+
+# Binary assets — never touch their bytes.
+*.png binary
+*.ico binary
+*.icns binary
+*.woff binary
+*.woff2 binary
+*.ttf binary

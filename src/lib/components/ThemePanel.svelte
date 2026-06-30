@@ -13,6 +13,10 @@
     Terminal: { emoji: '🖥️', blurb: 'Amber phosphor. Hack the mainframe.' },
     Overlord: { emoji: '💼', blurb: 'Tasteful thickness. Bone stock, blood-red power tie.' },
     BucketHub: { emoji: '🪣', blurb: 'Vanilla repository. Monospace, no nonsense. The no-theme theme.' },
+    Manuscript: { emoji: '📜', blurb: 'Ink on vellum. A quiet room for long-form writing.' },
+    Velvet: { emoji: '🍷', blurb: 'Aubergine and gold. Luxe, literary, after-hours.' },
+    Glacier: { emoji: '🧊', blurb: 'Cool slate calm — and the clearest code of the set.' },
+    Blueprint: { emoji: '📐', blurb: 'Cyan graph-paper. Drafting-table technical.' },
   }
   const MODES: Array<'light' | 'dark'> = ['light', 'dark']
 

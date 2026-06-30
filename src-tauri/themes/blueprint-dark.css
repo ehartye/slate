@@ -1,0 +1,26 @@
+/* @name Blueprint */
+/* @mode dark */
+:root {
+  --bg: #0c1a2b; --bg-elevated: #102338; --fg: #cfe3f5; --fg-muted: #6e8db0;
+  --border: #1c3450; --accent: #4db8e8; --accent-soft: rgba(77, 184, 232, 0.14);
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  --ui-font: 'IBM Plex Mono', 'Cascadia Mono', Consolas, monospace;
+  --editor-bg: #0c1a2b; --editor-fg: #cfe3f5; --editor-font: 'IBM Plex Mono', Consolas, monospace;
+  --prose-bg: #0c1a2b; --prose-fg: #cfe3f5;
+  --prose-font: 'Hanken Grotesk', 'Segoe UI', system-ui, sans-serif;
+  --prose-heading-font: 'IBM Plex Mono', 'Cascadia Mono', Consolas, monospace;
+  --prose-heading: #e6f2fc; --prose-link: #5cc6f0; --prose-code-bg: #102338;
+  --prose-max-width: 760px; --prose-line-height: 1.65;
+  --code-keyword: #5cc6f0; --code-string: #8fd0b0; --code-comment: #5a7290;
+  --code-number: #e0c070; --code-fn: #a0c0f0; --code-tag: #f09090;
+}
+
+/* ── drafting / graph-paper flair ── */
+.preview h1, .preview h2, .preview h3 { letter-spacing: 0.02em; }
+.preview h1, .preview h2 { text-transform: uppercase; font-size: 1.5em; }
+.preview h2 { font-size: 1.2em; }
+/* faint blueprint grid over the whole app */
+.app::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9000; opacity: 0.7;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(77, 184, 232, 0.05) 0 1px, transparent 1px 28px),
+    repeating-linear-gradient(90deg, rgba(77, 184, 232, 0.05) 0 1px, transparent 1px 28px); }
