@@ -1,3 +1,6 @@
+/* Shared rendered-markdown styling (also inlined into the browser export). */
+@import './prose.css';
+
 :root {
   /* Fallbacks before a theme loads (Aurora Dark). Real values come from the active theme. */
   --bg: #0b121d; --bg-elevated: #111b2b; --fg: #dce6f2; --fg-muted: #7b8aa3;
@@ -158,118 +161,8 @@ body { font-family: var(--ui-font); color: var(--fg); background: var(--bg); }
 
 .preview-pane { border-left: 1px solid var(--border); background: var(--prose-bg); }
 .preview-scroll { padding: 28px 26px; }
-.preview { color: var(--prose-fg); font-family: var(--prose-font); font-size: 16px;
-  max-width: var(--prose-max-width); margin: 0 auto; line-height: var(--prose-line-height); }
-.preview > :first-child { margin-top: 0; }
-.preview h1, .preview h2, .preview h3, .preview h4, .preview h5, .preview h6 {
-  font-family: var(--prose-heading-font); color: var(--prose-heading); line-height: 1.25; margin: 1.6em 0 0.6em; }
-.preview h1 { font-size: 2em; letter-spacing: -0.01em; }
-.preview h2 { font-size: 1.5em; }
-/* h3 takes the theme accent so ### reads as a heading, not just bold text —
-   this is the main fix for themes where smaller headings blended into body. */
-.preview h3 { font-size: 1.3em; color: var(--accent); }
-.preview h4 { font-size: 1.12em; }
-/* h5/h6 step toward body size, so they become tracked, muted labels that stay
-   distinct from paragraph text without competing with h3/h4. */
-.preview h5 { font-size: 0.95em; text-transform: uppercase; letter-spacing: 0.07em; }
-.preview h6 { font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.08em; color: var(--fg-muted); }
-.preview h1, .preview h2 { padding-bottom: 0.25em; border-bottom: 1px solid var(--border); }
-.preview p { margin: 0.85em 0; }
-.preview a { color: var(--prose-link); text-decoration: none; border-bottom: 1px solid transparent; }
-.preview a:hover { border-bottom-color: var(--prose-link); }
-.preview code { background: var(--prose-code-bg); padding: 0.12em 0.4em; border-radius: 5px;
-  font-family: var(--editor-font); font-size: 0.88em; }
-.preview pre { background: var(--prose-code-bg); padding: 14px 16px; border-radius: 10px;
-  overflow: auto; border: 1px solid var(--border); }
-.preview pre.hljs, .preview pre code { background: none; padding: 0; }
-.preview pre code { font-size: 0.86em; }
-.preview pre.mermaid { background: none; border: 0; text-align: center; }
-.preview blockquote { margin: 1em 0; padding: 0.4em 1em; border-left: 3px solid var(--accent);
-  color: var(--fg-muted); background: var(--accent-soft); border-radius: 0 8px 8px 0; }
-.preview hr { border: 0; border-top: 1px solid var(--border); margin: 2em 0; }
-.preview ul, .preview ol { padding-left: 1.4em; }
-.preview li { margin: 0.3em 0; }
-.preview table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 0.95em; }
-.preview th, .preview td { border: 1px solid var(--border); padding: 7px 11px; text-align: left; }
-.preview th { background: var(--accent-soft); font-family: var(--prose-heading-font); }
-.preview img { max-width: 100%; border-radius: 8px; }
-.preview input[type=checkbox] { margin-right: 0.5em; }
-
-/* highlight.js token colors driven by the active theme's --code-* variables */
-.preview .hljs-keyword, .preview .hljs-built_in, .preview .hljs-type,
-.preview .hljs-selector-tag, .preview .hljs-meta-keyword { color: var(--code-keyword); }
-.preview .hljs-string, .preview .hljs-attr, .preview .hljs-meta-string, .preview .hljs-meta .hljs-string,
-.preview .hljs-regexp, .preview .hljs-selector-attr, .preview .hljs-selector-pseudo { color: var(--code-string); }
-.preview .hljs-comment, .preview .hljs-quote { color: var(--code-comment); font-style: italic; }
-.preview .hljs-number, .preview .hljs-literal, .preview .hljs-symbol, .preview .hljs-bullet { color: var(--code-number); }
-.preview .hljs-title, .preview .hljs-title.function_, .preview .hljs-title.class_, .preview .hljs-section,
-.preview .hljs-selector-id, .preview .hljs-selector-class, .preview .hljs-property,
-.preview .hljs-meta { color: var(--code-fn); }
-.preview .hljs-name, .preview .hljs-tag, .preview .hljs-attribute,
-.preview .hljs-variable, .preview .hljs-template-variable { color: var(--code-tag); }
-.preview .hljs-emphasis { font-style: italic; }
-.preview .hljs-strong { font-weight: 700; }
-.preview .hljs-link { color: var(--prose-link); }
-.preview .hljs-deletion { color: #e5534b; }
-.preview .hljs-addition { color: #57ab5a; }
-
-/* zebra rows for long tables, theme-neutral via fg tint */
-.preview tbody tr:nth-child(even) { background: color-mix(in srgb, var(--fg) 5%, transparent); }
-
-/* ── Front-matter metadata card ────────────────────────── */
-.front-matter { border: 1px solid var(--border); border-radius: 10px; background: var(--bg-elevated);
-  padding: 0.7em 1em; margin: 0 0 1.5em; font-size: 0.9em; display: grid; gap: 0.3em; }
-.front-matter .fm-row { display: flex; gap: 0.9em; }
-.front-matter .fm-key { color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.05em;
-  font-size: 0.82em; min-width: 9ch; padding-top: 0.12em; }
-.front-matter .fm-val { color: var(--fg); flex: 1; }
-
-/* ── GitHub-style alerts (> [!NOTE] etc.) ──────────────── */
-.preview .markdown-alert { --alert: var(--accent); margin: 1.1em 0; padding: 0.7em 1em;
-  border-left: 3px solid var(--alert); border-radius: 0 9px 9px 0;
-  background: color-mix(in srgb, var(--alert) 10%, transparent); }
-.preview .markdown-alert > :first-child { margin-top: 0; }
-.preview .markdown-alert > :last-child { margin-bottom: 0; }
-.preview .markdown-alert-title { display: flex; align-items: center; gap: 0.45em;
-  font-weight: 700; color: var(--alert); margin-bottom: 0.35em; }
-.preview .markdown-alert-title svg { fill: currentColor; width: 1em; height: 1em; }
-.preview .markdown-alert-note { --alert: #539bf5; }
-.preview .markdown-alert-tip { --alert: #57ab5a; }
-.preview .markdown-alert-important { --alert: #986ee2; }
-.preview .markdown-alert-warning { --alert: #c69026; }
-.preview .markdown-alert-caution { --alert: #e5534b; }
-
-/* ── Footnotes ─────────────────────────────────────────── */
-.preview .footnote-ref a { border: 0; color: var(--prose-link); font-weight: 600; }
-.preview .footnotes-sep { margin-top: 2.4em; }
-.preview .footnotes { font-size: 0.88em; color: var(--fg-muted); }
-.preview .footnotes-list { padding-left: 1.4em; }
-.preview .footnote-item { margin: 0.4em 0; }
-.preview .footnote-backref { border: 0; text-decoration: none; }
-
-/* ── Heading permalinks + table of contents ────────────── */
-.preview :is(h1, h2, h3, h4, h5, h6) { position: relative; }
-.preview .header-anchor { position: absolute; left: -0.9em; opacity: 0; border: 0; font-weight: 400;
-  color: var(--fg-muted); text-decoration: none; transition: opacity .15s ease; }
-.preview :is(h1, h2, h3, h4, h5, h6):hover .header-anchor { opacity: 0.45; }
-.preview .header-anchor:hover { opacity: 1; color: var(--accent); }
-.preview .table-of-contents { background: var(--accent-soft); border: 1px solid var(--border);
-  border-radius: 9px; padding: 0.7em 1.1em; margin: 1.2em 0; font-size: 0.92em; }
-.preview .table-of-contents ul { margin: 0.15em 0; padding-left: 1.1em; }
-.preview .table-of-contents > ul { padding-left: 1.2em; }
-.preview .table-of-contents li { margin: 0.15em 0; }
-.preview .table-of-contents a { border: 0; }
-
-/* ── Inline extras: highlight, keys, sup/sub, details ──── */
-.preview mark { background: color-mix(in srgb, var(--accent) 28%, transparent);
-  color: inherit; padding: 0.05em 0.25em; border-radius: 3px; }
-.preview kbd { font-family: var(--editor-font); font-size: 0.82em; background: var(--bg-elevated);
-  color: var(--fg); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px;
-  padding: 0.1em 0.45em; box-shadow: 0 1px 0 var(--border); }
-.preview sup, .preview sub { font-size: 0.75em; line-height: 0; }
-.preview details { border: 1px solid var(--border); border-radius: 9px; padding: 0.6em 1em; margin: 1.1em 0; }
-.preview details[open] { padding-bottom: 0.8em; }
-.preview summary { cursor: pointer; font-weight: 600; color: var(--prose-heading); }
+/* All .preview / .front-matter rendered-markdown rules live in prose.css
+   (@import at top), shared with the browser export. */
 
 /* ── Status bar ────────────────────────────────────────── */
 .statusbar { display: flex; align-items: center; gap: 14px; padding: 5px 14px;
