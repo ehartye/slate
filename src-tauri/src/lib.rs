@@ -29,6 +29,10 @@ const STARTER_THEMES: &[(&str, &str)] = &[
     ("overlord-light.css", include_str!("../themes/overlord-light.css")),
     ("buckethub-dark.css", include_str!("../themes/buckethub-dark.css")),
     ("buckethub-light.css", include_str!("../themes/buckethub-light.css")),
+    ("manuscript-light.css", include_str!("../themes/manuscript-light.css")),
+    ("velvet-dark.css", include_str!("../themes/velvet-dark.css")),
+    ("glacier-dark.css", include_str!("../themes/glacier-dark.css")),
+    ("blueprint-dark.css", include_str!("../themes/blueprint-dark.css")),
 ];
 
 /// Pre-v2 starter filenames removed on seed so they don't linger alongside the new set.
@@ -65,7 +69,11 @@ fn seed_themes(app: &tauri::AppHandle) -> Result<(), String> {
     }
     for (name, body) in STARTER_THEMES {
         let path = dir.join(name);
-        if !path.exists() {
+        // Write when missing, and refresh when the bundled default has changed, so
+        // built-in theme improvements reach existing installs. User-created themes
+        // use other filenames and are never touched here.
+        let current = std::fs::read_to_string(&path).ok();
+        if current.as_deref() != Some(*body) {
             std::fs::write(&path, body).map_err(|e| e.to_string())?;
         }
     }

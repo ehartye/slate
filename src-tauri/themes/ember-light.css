@@ -11,6 +11,6 @@
   --prose-heading-font: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
   --prose-heading: #2c211a; --prose-link: #b5551f; --prose-code-bg: #efe5d6;
   --prose-max-width: 700px; --prose-line-height: 1.78;
-  --code-keyword: #b5551f; --code-string: #7a6a2a; --code-comment: #9a8a76;
-  --code-number: #a8531f; --code-fn: #8a5a2f; --code-tag: #b04a2a;
+  --code-keyword: #b5551f; --code-string: #5f7d2a; --code-comment: #9a8a76;
+  --code-number: #a8741f; --code-fn: #7a4a8a; --code-tag: #b03a5a;
 }

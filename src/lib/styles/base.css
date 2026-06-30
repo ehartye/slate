@@ -196,6 +196,64 @@ body { font-family: var(--ui-font); color: var(--fg); background: var(--bg); }
 .preview .hljs-title, .preview .hljs-title.function_, .preview .hljs-section { color: var(--code-fn); }
 .preview .hljs-name, .preview .hljs-tag, .preview .hljs-attribute { color: var(--code-tag); }
 
+/* zebra rows for long tables, theme-neutral via fg tint */
+.preview tbody tr:nth-child(even) { background: color-mix(in srgb, var(--fg) 5%, transparent); }
+
+/* ── Front-matter metadata card ────────────────────────── */
+.front-matter { border: 1px solid var(--border); border-radius: 10px; background: var(--bg-elevated);
+  padding: 0.7em 1em; margin: 0 0 1.5em; font-size: 0.9em; display: grid; gap: 0.3em; }
+.front-matter .fm-row { display: flex; gap: 0.9em; }
+.front-matter .fm-key { color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.05em;
+  font-size: 0.82em; min-width: 9ch; padding-top: 0.12em; }
+.front-matter .fm-val { color: var(--fg); flex: 1; }
+
+/* ── GitHub-style alerts (> [!NOTE] etc.) ──────────────── */
+.preview .markdown-alert { --alert: var(--accent); margin: 1.1em 0; padding: 0.7em 1em;
+  border-left: 3px solid var(--alert); border-radius: 0 9px 9px 0;
+  background: color-mix(in srgb, var(--alert) 10%, transparent); }
+.preview .markdown-alert > :first-child { margin-top: 0; }
+.preview .markdown-alert > :last-child { margin-bottom: 0; }
+.preview .markdown-alert-title { display: flex; align-items: center; gap: 0.45em;
+  font-weight: 700; color: var(--alert); margin-bottom: 0.35em; }
+.preview .markdown-alert-title svg { fill: currentColor; width: 1em; height: 1em; }
+.preview .markdown-alert-note { --alert: #539bf5; }
+.preview .markdown-alert-tip { --alert: #57ab5a; }
+.preview .markdown-alert-important { --alert: #986ee2; }
+.preview .markdown-alert-warning { --alert: #c69026; }
+.preview .markdown-alert-caution { --alert: #e5534b; }
+
+/* ── Footnotes ─────────────────────────────────────────── */
+.preview .footnote-ref a { border: 0; color: var(--prose-link); font-weight: 600; }
+.preview .footnotes-sep { margin-top: 2.4em; }
+.preview .footnotes { font-size: 0.88em; color: var(--fg-muted); }
+.preview .footnotes-list { padding-left: 1.4em; }
+.preview .footnote-item { margin: 0.4em 0; }
+.preview .footnote-backref { border: 0; text-decoration: none; }
+
+/* ── Heading permalinks + table of contents ────────────── */
+.preview :is(h1, h2, h3, h4, h5, h6) { position: relative; }
+.preview .header-anchor { position: absolute; left: -0.9em; opacity: 0; border: 0; font-weight: 400;
+  color: var(--fg-muted); text-decoration: none; transition: opacity .15s ease; }
+.preview :is(h1, h2, h3, h4, h5, h6):hover .header-anchor { opacity: 0.45; }
+.preview .header-anchor:hover { opacity: 1; color: var(--accent); }
+.preview .table-of-contents { background: var(--accent-soft); border: 1px solid var(--border);
+  border-radius: 9px; padding: 0.7em 1.1em; margin: 1.2em 0; font-size: 0.92em; }
+.preview .table-of-contents ul { margin: 0.15em 0; padding-left: 1.1em; }
+.preview .table-of-contents > ul { padding-left: 1.2em; }
+.preview .table-of-contents li { margin: 0.15em 0; }
+.preview .table-of-contents a { border: 0; }
+
+/* ── Inline extras: highlight, keys, sup/sub, details ──── */
+.preview mark { background: color-mix(in srgb, var(--accent) 28%, transparent);
+  color: inherit; padding: 0.05em 0.25em; border-radius: 3px; }
+.preview kbd { font-family: var(--editor-font); font-size: 0.82em; background: var(--bg-elevated);
+  color: var(--fg); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px;
+  padding: 0.1em 0.45em; box-shadow: 0 1px 0 var(--border); }
+.preview sup, .preview sub { font-size: 0.75em; line-height: 0; }
+.preview details { border: 1px solid var(--border); border-radius: 9px; padding: 0.6em 1em; margin: 1.1em 0; }
+.preview details[open] { padding-bottom: 0.8em; }
+.preview summary { cursor: pointer; font-weight: 600; color: var(--prose-heading); }
+
 /* ── Status bar ────────────────────────────────────────── */
 .statusbar { display: flex; align-items: center; gap: 14px; padding: 5px 14px;
   background: var(--bg-elevated); border-top: 1px solid var(--border); color: var(--fg-muted); font-size: 11.5px; }

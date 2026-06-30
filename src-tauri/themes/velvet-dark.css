@@ -1,0 +1,25 @@
+/* @name Velvet */
+/* @mode dark */
+:root {
+  --bg: #16121b; --bg-elevated: #1f1926; --fg: #ece4d6; --fg-muted: #9a8d86;
+  --border: #312636; --accent: #c9a227; --accent-soft: rgba(201, 162, 39, 0.15);
+  --shadow: 0 14px 40px rgba(0, 0, 0, 0.6);
+  --ui-font: 'EB Garamond', Georgia, serif;
+  --editor-bg: #16121b; --editor-fg: #ece4d6; --editor-font: 'Cascadia Mono', 'Consolas', ui-monospace, monospace;
+  --prose-bg: #16121b; --prose-fg: #e6ddcd;
+  --prose-font: 'EB Garamond', Georgia, serif;
+  --prose-heading-font: 'EB Garamond', Georgia, serif;
+  --prose-heading: #f6efe0; --prose-link: #d8b24a; --prose-code-bg: #211a28;
+  --prose-max-width: 720px; --prose-line-height: 1.72;
+  --code-keyword: #d8b24a; --code-string: #8fc7a0; --code-comment: #7a6b80;
+  --code-number: #e0a060; --code-fn: #d98aa8; --code-tag: #6fc2c0;
+}
+
+/* ── gilded, refined flair ── */
+.preview { font-size: 18px; }
+.preview h1, .preview h2, .preview h3 { letter-spacing: 0.01em; }
+.preview h1, .preview h2 { border-bottom-color: var(--accent-soft); }
+.preview a { color: var(--accent); }
+/* faint vignette to deepen the velvet field */
+.app::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9000;
+  background: radial-gradient(120% 90% at 50% 0%, transparent 55%, rgba(0, 0, 0, 0.35) 100%); }

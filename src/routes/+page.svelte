@@ -19,6 +19,12 @@
   import '@fontsource/ibm-plex-mono/600.css'
   import '@fontsource/eb-garamond/400.css'
   import '@fontsource/eb-garamond/600.css'
+  import '@fontsource/newsreader/400.css'
+  import '@fontsource/newsreader/400-italic.css'
+  import '@fontsource/newsreader/600.css'
+  import '@fontsource/hanken-grotesk/400.css'
+  import '@fontsource/hanken-grotesk/600.css'
+  import '@fontsource/hanken-grotesk/700.css'
   import '$lib/styles/base.css'
 
   let previewPane = $state<HTMLElement>()

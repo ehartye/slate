@@ -18,6 +18,8 @@
 /* ── Game Boy DMG flair (active only while Arcade is selected) ── */
 .browser-btn, .mode-toggle, .mode-btn, .swatch, .sidebar li button,
 .preview pre, .preview code, .preview blockquote, .preview th, .preview td { border-radius: 0 !important; }
+/* inline code shares the bg's green ramp — give it an outline so it reads */
+.preview :not(pre) > code { border: 1px solid var(--accent); }
 .brand { font-family: 'Press Start 2P', 'VT323', monospace; font-size: 11px; letter-spacing: 0; }
 .file, .muted { font-size: 16px; }
 .cm-host .cm-scroller { font-size: 18px; }

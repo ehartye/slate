@@ -11,8 +11,8 @@
   --prose-heading-font: 'EB Garamond', Georgia, serif;
   --prose-heading: #0d0c08; --prose-link: #8a1c1c; --prose-code-bg: #e3ddcb;
   --prose-max-width: 720px; --prose-line-height: 1.7;
-  --code-keyword: #8a1c1c; --code-string: #555040; --code-comment: #9a917c;
-  --code-number: #3a3a3a; --code-fn: #2a2a2a; --code-tag: #6a1818;
+  --code-keyword: #8a1c1c; --code-string: #5a6a3a; --code-comment: #9a917c;
+  --code-number: #9a6a1f; --code-fn: #3a5a7a; --code-tag: #7a1838;
 }
 
 /* ── corporate business-card flair ── */

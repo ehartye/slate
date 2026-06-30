@@ -14,3 +14,7 @@
   --code-keyword: #c2a8ff; --code-string: #7fe0c0; --code-comment: #5b6b85;
   --code-number: #ffb27a; --code-fn: #6fb8ff; --code-tag: #ff8ab0;
 }
+
+/* ── faint borealis wash from the top edge ── */
+.app::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9000;
+  background: radial-gradient(90% 55% at 50% -12%, rgba(79, 209, 197, 0.11), transparent 70%); }
