@@ -26,6 +26,11 @@ body{margin:0;background:var(--prose-bg,#fff);}
 .preview .hljs-number,.preview .hljs-literal{color:var(--code-number,#d19a66);}
 .preview .hljs-title,.preview .hljs-section{color:var(--code-fn,#61afef);}
 .preview .hljs-name,.preview .hljs-tag{color:var(--code-tag,#e06c75);}
+.preview :is(h1,h2,h3,h4,h5,h6){position:relative;}
+.preview .header-anchor{position:absolute;left:-0.9em;opacity:0;border:0;font-weight:400;
+  color:var(--fg-muted,#666);text-decoration:none;transition:opacity .15s ease;}
+.preview :is(h1,h2,h3,h4,h5,h6):hover .header-anchor{opacity:0.45;}
+.preview .header-anchor:hover{opacity:1;color:var(--accent,#888);}
 `
 
 export function buildStandaloneHtml(bodyHtml: string, themeCss: string, title: string): string {
