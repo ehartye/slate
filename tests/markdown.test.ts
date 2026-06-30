@@ -23,6 +23,16 @@ describe('renderMarkdown extras', () => {
     expect(out).toContain('class="hljs"')
     expect(out).toContain('hljs-keyword') // `const`
   })
+  it('auto-highlights an unlabeled code fence', () => {
+    const out = renderMarkdown('```\nfunction greet() { return "hi" }\n```')
+    expect(out).toContain('class="hljs"')
+    expect(out).toMatch(/hljs-\w/) // some token class, via auto-detection
+  })
+  it('highlights apex as java (no native apex grammar)', () => {
+    const out = renderMarkdown('```apex\npublic class Foo { Integer x = 1; }\n```')
+    expect(out).toContain('class="hljs"')
+    expect(out).toContain('hljs-keyword') // `public`/`class` via the java grammar
+  })
   it('renders inline math via KaTeX', () => {
     expect(renderMarkdown('$E=mc^2$')).toContain('class="katex"')
   })

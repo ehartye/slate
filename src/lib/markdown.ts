@@ -11,6 +11,12 @@ import githubAlerts from 'markdown-it-github-alerts'
 import hljs from 'highlight.js'
 import katex from '@vscode/markdown-it-katex'
 
+// Fences whose language highlight.js has no grammar for, mapped to the closest
+// supported one. Apex is Salesforce's Java-shaped language — java highlights it well.
+const LANG_ALIASES: Record<string, string> = {
+  apex: 'java',
+}
+
 const md: MarkdownIt = new MarkdownIt({
   html: false,
   linkify: true,
@@ -19,15 +25,24 @@ const md: MarkdownIt = new MarkdownIt({
     if (lang === 'mermaid') {
       return `<pre class="mermaid">${md.utils.escapeHtml(code)}</pre>`
     }
-    if (lang && hljs.getLanguage(lang)) {
+    const resolved = lang ? (LANG_ALIASES[lang.toLowerCase()] ?? lang) : ''
+    let inner: string
+    if (resolved && hljs.getLanguage(resolved)) {
       try {
-        const inner = hljs.highlight(code, { language: lang }).value
-        return `<pre class="hljs"><code>${inner}</code></pre>`
+        inner = hljs.highlight(code, { language: resolved }).value
       } catch {
-        /* fall through */
+        inner = md.utils.escapeHtml(code)
+      }
+    } else {
+      // No (or unknown) language fence: auto-detect so bare ``` blocks still
+      // get highlighted instead of rendering as flat, uncolored text.
+      try {
+        inner = hljs.highlightAuto(code).value
+      } catch {
+        inner = md.utils.escapeHtml(code)
       }
     }
-    return `<pre class="hljs"><code>${md.utils.escapeHtml(code)}</code></pre>`
+    return `<pre class="hljs"><code>${inner}</code></pre>`
   },
 })
 
