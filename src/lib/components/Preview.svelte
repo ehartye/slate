@@ -104,7 +104,7 @@
 <div
   class="preview"
   bind:this={container}
-  style="font-size: {$previewZoom * 16}px"
+  style="font-size: {$previewZoom * 16}px; max-width: calc(var(--prose-max-width) * {$previewZoom})"
 >
   {@html html}
 </div>
