@@ -4,12 +4,12 @@
   --bg: #eef2f7; --bg-elevated: #e2e9f2; --fg: #22304a; --fg-muted: #5f7391;
   --border: #c5d2e2; --accent: #0898c0; --accent-soft: rgba(8, 152, 192, 0.12);
   --shadow: 0 10px 30px rgba(50, 80, 120, 0.16);
-  --ui-font: 'HeavyData Nerd Font', 'Hanken Grotesk', system-ui, sans-serif;
+  --ui-font: 'Hanken Grotesk', 'Segoe UI', system-ui, sans-serif;
   --editor-bg: #eef2f7; --editor-fg: #22304a;
-  --editor-font: 'HeavyData Nerd Font', 'Cascadia Mono', monospace;
+  --editor-font: 'Cascadia Mono', 'Consolas', ui-monospace, monospace;
   --prose-bg: #eef2f7; --prose-fg: #22304a;
   --prose-font: 'Hanken Grotesk', 'Segoe UI', system-ui, sans-serif;
-  --prose-heading-font: 'HeavyData Nerd Font', 'Hanken Grotesk', sans-serif;
+  --prose-heading-font: 'Orbitron', 'Hanken Grotesk', sans-serif;
   --prose-heading: #16243c; --prose-link: #6f4fd8; --prose-code-bg: #e3eaf4;
   --prose-max-width: 740px; --prose-line-height: 1.7;
   --code-keyword: #0898c0; --code-string: #2f8f5f; --code-comment: #8598b0;
