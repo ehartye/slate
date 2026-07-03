@@ -1,0 +1,22 @@
+/* @name Manuscript */
+/* @mode dark */
+:root {
+  --bg: #201b15; --bg-elevated: #2a2318; --fg: #e8e0d0; --fg-muted: #998c76;
+  --border: #3a3226; --accent: #7ba3c9; --accent-soft: rgba(123, 163, 201, 0.12);
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  --ui-font: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+  --editor-bg: #241e17; --editor-fg: #e8e0d0; --editor-font: 'Cascadia Mono', 'Consolas', ui-monospace, monospace;
+  --prose-bg: #241e17; --prose-fg: #e8e0d0;
+  --prose-font: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+  --prose-heading-font: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+  --prose-heading: #f2ecdd; --prose-link: #86aed4; --prose-code-bg: #292217;
+  --prose-max-width: 720px; --prose-line-height: 1.85;
+  --code-keyword: #cf8a5a; --code-string: #8fb87a; --code-comment: #7d715c;
+  --code-number: #d9a05e; --code-fn: #7ba3c9; --code-tag: #c07ba0;
+}
+
+/* ── quiet, book-like reading flair ── */
+.preview { font-size: 17px; }
+.preview h1, .preview h2, .preview h3 { font-weight: 600; letter-spacing: -0.01em; }
+.preview h1 { font-size: 2.1em; }
+.preview blockquote { font-style: italic; }
