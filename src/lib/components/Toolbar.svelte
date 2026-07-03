@@ -44,11 +44,23 @@
 <header class="toolbar">
   <button
     class="icon-btn sidebar-toggle"
-    class:off={$sidebarCollapsed}
     onclick={() => sidebarCollapsed.update((v) => !v)}
     title={$sidebarCollapsed ? 'Show file browser' : 'Hide file browser'}
     aria-label="Toggle file browser"
-  >▐</button>
+    aria-pressed={!$sidebarCollapsed}
+  >
+    <!-- App frame with the sidebar pane: filled while shown, empty while hidden. -->
+    <svg width="16" height="14" viewBox="0 0 16 14" aria-hidden="true">
+      <rect x="0.75" y="0.75" width="14.5" height="12.5" rx="2.5"
+        fill="none" stroke="currentColor" stroke-width="1.5"/>
+      {#if $sidebarCollapsed}
+        <line x1="6" y1="0.75" x2="6" y2="13.25" stroke="currentColor" stroke-width="1.5"/>
+      {:else}
+        <path d="M3.25 0.75 H6 V13.25 H3.25 A2.5 2.5 0 0 1 0.75 10.75 V3.25 A2.5 2.5 0 0 1 3.25 0.75 Z"
+          fill="currentColor"/>
+      {/if}
+    </svg>
+  </button>
   <span class="brand"><span class="brand-dot"></span>Slate</span>
   {#if $currentFile}
     <span class="file">{baseName($currentFile)}{#if $dirty}<span class="file-dot" title="Unsaved"></span>{/if}</span>
