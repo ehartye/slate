@@ -108,9 +108,11 @@ body { font-family: var(--ui-font); color: var(--fg); background: var(--bg); }
 .body { flex: 1; display: flex; min-height: 0; }
 .sidebar { width: 220px; background: var(--bg-elevated); border-right: 1px solid var(--border);
   overflow: auto; padding: 10px; }
-.folder-btn { width: 100%; text-align: left; background: none; border: 0; color: var(--fg-muted);
+.sidebar-head { display: flex; align-items: center; gap: 2px; padding-bottom: 6px; }
+.folder-btn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  text-align: left; background: none; border: 0; color: var(--fg-muted);
   cursor: pointer; font: inherit; font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase;
-  padding: 4px 6px 10px; }
+  padding: 4px 6px; }
 .folder-btn:hover { color: var(--accent); }
 .sidebar ul { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .sidebar li button { width: 100%; text-align: left; background: none; border: 0; color: var(--fg);
