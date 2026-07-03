@@ -1,0 +1,34 @@
+/* @name Kapow */
+/* @mode dark */
+:root {
+  --bg: #191519; --bg-elevated: #242024; --fg: #f0e8d4; --fg-muted: #9a8f7d;
+  --border: #453c45; --accent: #ff5546; --accent-soft: rgba(255, 85, 70, 0.14);
+  --shadow: 5px 5px 0 rgba(0, 0, 0, 0.7);
+  --ui-font: 'ComicShannsMono Nerd Font', 'Comic Sans MS', monospace;
+  --editor-bg: #191519; --editor-fg: #f0e8d4;
+  --editor-font: 'ComicShannsMono Nerd Font', 'Cascadia Mono', monospace;
+  --prose-bg: #191519; --prose-fg: #f0e8d4;
+  --prose-font: 'ComicShannsMono Nerd Font', 'Comic Sans MS', monospace;
+  --prose-heading-font: 'ComicShannsMono Nerd Font', 'Comic Sans MS', monospace;
+  --prose-heading: #fff6de; --prose-link: #56c8e8; --prose-code-bg: #241c20;
+  --prose-max-width: 700px; --prose-line-height: 1.7;
+  --code-keyword: #ff5546; --code-string: #5fd06f; --code-comment: #857a68;
+  --code-number: #ffa040; --code-fn: #56c8e8; --code-tag: #e070d8;
+}
+
+/* ── Kapow flair (active only while Kapow is selected) ───── */
+/* Night-edition halftone. */
+.app::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9000;
+  background-image: radial-gradient(circle, rgba(240, 232, 212, 0.045) 1px, transparent 1.4px);
+  background-size: 7px 7px; }
+/* Headline misprint — the red plate is a hair off-register. */
+.preview h1 { text-shadow: 3px 3px 0 rgba(255, 85, 70, 0.4); }
+/* Code and tables become inked comic panels. */
+.preview pre { border: 2.5px solid #f0e8d4; border-radius: 6px;
+  box-shadow: 5px 5px 0 rgba(0, 0, 0, 0.85); }
+.preview th, .preview td { border-width: 2px; border-color: #6a5f6a; }
+/* Blockquotes become speech bubbles. */
+.preview blockquote { position: relative; border: 3px solid #f0e8d4; border-radius: 14px;
+  background: var(--bg-elevated); color: var(--fg); margin-bottom: 1.6em; }
+.preview blockquote::after { content: ''; position: absolute; bottom: -17px; left: 34px;
+  border: 8px solid transparent; border-top: 10px solid #f0e8d4; }

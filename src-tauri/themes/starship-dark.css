@@ -1,0 +1,25 @@
+/* @name Starship */
+/* @mode dark */
+:root {
+  --bg: #0a0e1a; --bg-elevated: #101828; --fg: #cfe0f5; --fg-muted: #66799a;
+  --border: #1c2a45; --accent: #35e0ff; --accent-soft: rgba(53, 224, 255, 0.13);
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+  --ui-font: 'HeavyData Nerd Font', 'Hanken Grotesk', system-ui, sans-serif;
+  --editor-bg: #0a0e1a; --editor-fg: #cfe0f5;
+  --editor-font: 'HeavyData Nerd Font', 'Cascadia Mono', monospace;
+  --prose-bg: #0a0e1a; --prose-fg: #cfe0f5;
+  --prose-font: 'Hanken Grotesk', 'Segoe UI', system-ui, sans-serif;
+  --prose-heading-font: 'HeavyData Nerd Font', 'Hanken Grotesk', sans-serif;
+  --prose-heading: #e8f6ff; --prose-link: #9f7fff; --prose-code-bg: #0f1a30;
+  --prose-max-width: 740px; --prose-line-height: 1.7;
+  --code-keyword: #35e0ff; --code-string: #6fe8a0; --code-comment: #4a5d80;
+  --code-number: #ffb454; --code-fn: #9f7fff; --code-tag: #ff6fa8;
+}
+
+/* ── Starship flair (active only while Starship is selected) ── */
+/* Console panels get notched sci-fi corners. */
+.preview pre, .preview blockquote { border-radius: 0;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px)); }
+.preview h2, .preview h3 { letter-spacing: 0.03em; }
+/* Headings carry a faint holo glow. */
+.preview h1, .preview h2 { text-shadow: 0 0 14px rgba(53, 224, 255, 0.25); }

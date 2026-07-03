@@ -1,0 +1,29 @@
+/* @name Mainframe */
+/* @mode light */
+:root {
+  --bg: #f2efe0; --bg-elevated: #e8e4d0; --fg: #1d5c30; --fg-muted: #6e8f76;
+  --border: #c8cbb0; --accent: #2f8f4a; --accent-soft: rgba(47, 143, 74, 0.13);
+  --shadow: 0 10px 30px rgba(60, 90, 60, 0.15);
+  --ui-font: 'BigBlueTerm437 Nerd Font', 'Consolas', monospace;
+  --editor-bg: #f2efe0; --editor-fg: #1d5c30;
+  --editor-font: 'BigBlueTerm437 Nerd Font', 'Consolas', monospace;
+  --prose-bg: #f2efe0; --prose-fg: #1d5c30;
+  --prose-font: 'BigBlueTerm437 Nerd Font', 'Consolas', monospace;
+  --prose-heading-font: 'BigBlueTerm437 Nerd Font', 'Consolas', monospace;
+  --prose-heading: #14512a; --prose-link: #2f8f4a; --prose-code-bg: #e9e6d2;
+  --prose-max-width: 720px; --prose-line-height: 1.65;
+  --code-keyword: #14512a; --code-string: #4a7f3a; --code-comment: #93a389;
+  --code-number: #2f6f5f; --code-fn: #256e3e; --code-tag: #3f8f6f;
+}
+
+/* ── Mainframe flair (active only while Mainframe is selected) ── */
+/* Big iron has no rounded corners. */
+.browser-btn, .theme-open-btn, .sidebar li button, .icon-btn, .collapse-btn,
+.preview pre, .preview code, .preview blockquote, .preview img,
+.preview th, .preview td { border-radius: 0 !important; }
+/* Tractor-feed green-bar paper. */
+.app::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9000;
+  background: repeating-linear-gradient(0deg,
+    rgba(47, 143, 74, 0.055) 0 28px, transparent 28px 56px); }
+/* The prompt awaits. */
+.preview h1::before { content: '> '; }
