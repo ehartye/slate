@@ -9,7 +9,7 @@
   import { baseName } from '$lib/tauri'
   import { listThemes, applyThemeVariant, savedThemeChoice, type Theme } from '$lib/theme'
   import { renderMarkdown } from '$lib/markdown'
-  import { buildStandaloneHtml } from '$lib/export'
+  import { buildStandaloneHtml, collectThemeFontCss } from '$lib/export'
   import ThemePanel from './ThemePanel.svelte'
 
   let panelOpen = $state(false)
@@ -32,10 +32,12 @@
 
   async function openInBrowser() {
     const theme = $themes.find((t) => t.name === $activeThemeName && t.mode === $activeMode)
+    const fontCss = await collectThemeFontCss(theme?.css ?? '')
     const html = buildStandaloneHtml(
       renderMarkdown($content),
       theme?.css ?? '',
       $currentFile ? baseName($currentFile) : 'Slate',
+      fontCss,
     )
     await invoke('open_in_browser', { html })
   }
