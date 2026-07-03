@@ -39,6 +39,12 @@ const STARTER_THEMES: &[(&str, &str)] = &[
     ("blueprint-light.css", include_str!("../themes/blueprint-light.css")),
     ("groovy-dark.css", include_str!("../themes/groovy-dark.css")),
     ("groovy-light.css", include_str!("../themes/groovy-light.css")),
+    ("kapow-dark.css", include_str!("../themes/kapow-dark.css")),
+    ("kapow-light.css", include_str!("../themes/kapow-light.css")),
+    ("starship-dark.css", include_str!("../themes/starship-dark.css")),
+    ("starship-light.css", include_str!("../themes/starship-light.css")),
+    ("mainframe-dark.css", include_str!("../themes/mainframe-dark.css")),
+    ("mainframe-light.css", include_str!("../themes/mainframe-light.css")),
 ];
 
 /// Pre-v2 starter filenames removed on seed so they don't linger alongside the new set.

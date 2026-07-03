@@ -18,6 +18,9 @@
     Glacier: { emoji: '🧊', blurb: 'Cool slate calm — and the clearest code of the set.' },
     Blueprint: { emoji: '📐', blurb: 'Cyan graph-paper. Drafting-table technical.' },
     Groovy: { emoji: '☮️', blurb: 'Tie-dye rainbow, dyslexia-friendly type. Far out.' },
+    Kapow: { emoji: '💥', blurb: 'Newsprint halftone, speech-bubble quotes. Ka-pow!' },
+    Starship: { emoji: '🚀', blurb: 'Holo-console cyan on deep space. Engage.' },
+    Mainframe: { emoji: '💾', blurb: 'Green phosphor by night, tractor-feed printout by day.' },
   }
   const MODES: Array<'light' | 'dark'> = ['light', 'dark']
 
