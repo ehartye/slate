@@ -17,6 +17,7 @@
     Velvet: { emoji: '🍷', blurb: 'Aubergine and gold. Luxe, literary, after-hours.' },
     Glacier: { emoji: '🧊', blurb: 'Cool slate calm — and the clearest code of the set.' },
     Blueprint: { emoji: '📐', blurb: 'Cyan graph-paper. Drafting-table technical.' },
+    Groovy: { emoji: '☮️', blurb: 'Tie-dye rainbow, dyslexia-friendly type. Far out.' },
   }
   const MODES: Array<'light' | 'dark'> = ['light', 'dark']
 

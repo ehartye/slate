@@ -1,0 +1,26 @@
+/* @name Blueprint */
+/* @mode light */
+:root {
+  --bg: #f3f6f9; --bg-elevated: #e9eef4; --fg: #223a52; --fg-muted: #5f7891;
+  --border: #c9d6e2; --accent: #1f7fb8; --accent-soft: rgba(31, 127, 184, 0.12);
+  --shadow: 0 10px 30px rgba(50, 80, 110, 0.15);
+  --ui-font: 'IBM Plex Mono', 'Cascadia Mono', Consolas, monospace;
+  --editor-bg: #f3f6f9; --editor-fg: #223a52; --editor-font: 'IBM Plex Mono', Consolas, monospace;
+  --prose-bg: #f3f6f9; --prose-fg: #223a52;
+  --prose-font: 'Hanken Grotesk', 'Segoe UI', system-ui, sans-serif;
+  --prose-heading-font: 'IBM Plex Mono', 'Cascadia Mono', Consolas, monospace;
+  --prose-heading: #16334d; --prose-link: #1a76ad; --prose-code-bg: #e7edf3;
+  --prose-max-width: 760px; --prose-line-height: 1.65;
+  --code-keyword: #1a76ad; --code-string: #2e7f57; --code-comment: #8598ac;
+  --code-number: #a8742a; --code-fn: #3a62b8; --code-tag: #c04a58;
+}
+
+/* ── drafting / graph-paper flair ── */
+.preview h1, .preview h2, .preview h3 { letter-spacing: 0.02em; }
+.preview h1, .preview h2 { text-transform: uppercase; font-size: 1.5em; }
+.preview h2 { font-size: 1.2em; }
+/* faint pencil grid over the whole sheet */
+.app::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9000; opacity: 0.7;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(31, 100, 150, 0.06) 0 1px, transparent 1px 28px),
+    repeating-linear-gradient(90deg, rgba(31, 100, 150, 0.06) 0 1px, transparent 1px 28px); }

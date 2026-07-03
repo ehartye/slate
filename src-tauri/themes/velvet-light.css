@@ -1,0 +1,25 @@
+/* @name Velvet */
+/* @mode light */
+:root {
+  --bg: #f5efe3; --bg-elevated: #ece2d2; --fg: #2e2430; --fg-muted: #857488;
+  --border: #ddd0c2; --accent: #a5821e; --accent-soft: rgba(165, 130, 30, 0.14);
+  --shadow: 0 14px 40px rgba(70, 45, 75, 0.18);
+  --ui-font: 'EB Garamond', Georgia, serif;
+  --editor-bg: #f5efe3; --editor-fg: #2e2430; --editor-font: 'Cascadia Mono', 'Consolas', ui-monospace, monospace;
+  --prose-bg: #f5efe3; --prose-fg: #342a36;
+  --prose-font: 'EB Garamond', Georgia, serif;
+  --prose-heading-font: 'EB Garamond', Georgia, serif;
+  --prose-heading: #241a28; --prose-link: #96751a; --prose-code-bg: #ede4d0;
+  --prose-max-width: 720px; --prose-line-height: 1.72;
+  --code-keyword: #96751a; --code-string: #3f7a52; --code-comment: #99889c;
+  --code-number: #b07030; --code-fn: #a84a72; --code-tag: #2f8a88;
+}
+
+/* ── gilded, refined flair ── */
+.preview { font-size: 18px; }
+.preview h1, .preview h2, .preview h3 { letter-spacing: 0.01em; }
+.preview h1, .preview h2 { border-bottom-color: var(--accent-soft); }
+.preview a { color: var(--accent); }
+/* faint vignette to warm the ivory field */
+.app::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9000;
+  background: radial-gradient(120% 90% at 50% 0%, transparent 60%, rgba(70, 45, 75, 0.10) 100%); }

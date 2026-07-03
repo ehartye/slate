@@ -1,0 +1,16 @@
+/* @name Glacier */
+/* @mode light */
+:root {
+  --bg: #eef3f8; --bg-elevated: #e2eaf2; --fg: #26313f; --fg-muted: #64768c;
+  --border: #cdd9e5; --accent: #2e7fa3; --accent-soft: rgba(46, 127, 163, 0.13);
+  --shadow: 0 10px 30px rgba(60, 90, 120, 0.18);
+  --ui-font: 'Hanken Grotesk', 'Segoe UI', system-ui, sans-serif;
+  --editor-bg: #eef3f8; --editor-fg: #26313f; --editor-font: 'Cascadia Mono', 'Consolas', ui-monospace, monospace;
+  --prose-bg: #eef3f8; --prose-fg: #26313f;
+  --prose-font: 'Hanken Grotesk', 'Segoe UI', system-ui, sans-serif;
+  --prose-heading-font: 'Hanken Grotesk', 'Segoe UI', system-ui, sans-serif;
+  --prose-heading: #1b2530; --prose-link: #2a7ba0; --prose-code-bg: #e4ebf3;
+  --prose-max-width: 760px; --prose-line-height: 1.7;
+  --code-keyword: #7a4fb0; --code-string: #3a7f4a; --code-comment: #8fa0b5;
+  --code-number: #b0722a; --code-fn: #2f6fae; --code-tag: #b8496e;
+}

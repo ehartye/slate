@@ -1,0 +1,32 @@
+/* @name Groovy */
+/* @mode dark */
+:root {
+  --bg: #1a1028; --bg-elevated: #251739; --fg: #f2e5cf; --fg-muted: #a690c2;
+  --border: #3d2a5c; --accent: #f458a8; --accent-soft: rgba(244, 88, 168, 0.16);
+  --shadow: 0 10px 30px rgba(10, 4, 20, 0.6);
+  --ui-font: 'OpenDyslexic Nerd Font', 'OpenDyslexic', 'Comic Sans MS', sans-serif;
+  --editor-bg: #1a1028; --editor-fg: #f2e5cf;
+  --editor-font: 'OpenDyslexicM Nerd Font', 'CaskaydiaCove Nerd Font Mono', 'Consolas', monospace;
+  --prose-bg: #1a1028; --prose-fg: #f2e5cf;
+  --prose-font: 'OpenDyslexic Nerd Font', 'OpenDyslexic', 'Comic Sans MS', sans-serif;
+  --prose-heading-font: 'OpenDyslexic Nerd Font', 'OpenDyslexic', 'Comic Sans MS', sans-serif;
+  --prose-heading: #ffcf6b; --prose-link: #4fd8c4; --prose-code-bg: #271a42;
+  --prose-max-width: 680px; --prose-line-height: 1.85;
+  --code-keyword: #f47ac0; --code-string: #a8d26a; --code-comment: #8a76a8;
+  --code-number: #ffc966; --code-fn: #5fd3e0; --code-tag: #ff9142;
+}
+
+/* ── Groovy flair (active only while Groovy is selected) ─── */
+/* The seventies stripe: h1/h2 underline becomes a five-band rainbow. */
+.preview h1, .preview h2 { border-bottom: 4px solid transparent; padding-bottom: 0.3em;
+  border-image: linear-gradient(90deg,
+    #ff9142 0 20%, #ffcf6b 20% 40%, #a8d26a 40% 60%, #4fd8c4 60% 80%, #f458a8 80% 100%) 1; }
+/* Flowers for bullets, a peace sign for thematic breaks. */
+.preview ul li:not(.task-list-item)::marker { content: '✿  '; color: var(--accent); font-size: 0.85em; }
+.preview hr { border: 0; margin: 2em 0; text-align: center; }
+.preview hr::after { content: '✿ ☮ ✿'; display: block; color: var(--accent);
+  font-size: 1.05em; letter-spacing: 0.6em; padding-left: 0.6em; }
+/* Nerd Font glyphs (nf-fa range) for the doc list and folder button. */
+.sidebar li button::before { content: '\f0f6  '; color: var(--fg-muted); }
+.sidebar li button.active::before { color: var(--accent); }
+.folder-btn::before { content: '\f115  '; }

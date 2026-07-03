@@ -30,9 +30,15 @@ const STARTER_THEMES: &[(&str, &str)] = &[
     ("buckethub-dark.css", include_str!("../themes/buckethub-dark.css")),
     ("buckethub-light.css", include_str!("../themes/buckethub-light.css")),
     ("manuscript-light.css", include_str!("../themes/manuscript-light.css")),
+    ("manuscript-dark.css", include_str!("../themes/manuscript-dark.css")),
     ("velvet-dark.css", include_str!("../themes/velvet-dark.css")),
+    ("velvet-light.css", include_str!("../themes/velvet-light.css")),
     ("glacier-dark.css", include_str!("../themes/glacier-dark.css")),
+    ("glacier-light.css", include_str!("../themes/glacier-light.css")),
     ("blueprint-dark.css", include_str!("../themes/blueprint-dark.css")),
+    ("blueprint-light.css", include_str!("../themes/blueprint-light.css")),
+    ("groovy-dark.css", include_str!("../themes/groovy-dark.css")),
+    ("groovy-light.css", include_str!("../themes/groovy-light.css")),
 ];
 
 /// Pre-v2 starter filenames removed on seed so they don't linger alongside the new set.
