@@ -2,6 +2,7 @@
   import { open } from '@tauri-apps/plugin-dialog'
   import { currentFolder, files, currentFile, content, dirty, statusMsg } from '$lib/stores'
   import { listMarkdownFiles, readFile, baseName } from '$lib/tauri'
+  import { loadFile, refreshWorkspace } from '$lib/workspace'
 
   async function chooseFolder() {
     const picked = await open({ directory: true })
@@ -12,6 +13,14 @@
     } catch (e) {
       statusMsg.set(`Could not list folder: ${e}`)
     }
+  }
+
+  async function chooseFile() {
+    const picked = await open({
+      filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }],
+    })
+    if (typeof picked !== 'string') return
+    await loadFile(picked)
   }
 
   async function openFile(path: string) {
@@ -27,9 +36,13 @@
 </script>
 
 <aside class="sidebar">
-  <button class="folder-btn" onclick={chooseFolder}>
-    {$currentFolder ? baseName($currentFolder) : 'Choose folder…'}
-  </button>
+  <div class="sidebar-head">
+    <button class="folder-btn" onclick={chooseFolder} title="Choose folder…">
+      {$currentFolder ? baseName($currentFolder) : 'Choose folder…'}
+    </button>
+    <button class="icon-btn" onclick={chooseFile} title="Open markdown file…">🗎</button>
+    <button class="icon-btn" onclick={refreshWorkspace} title="Refresh file list and reload from disk">⟳</button>
+  </div>
   <ul>
     {#each $files as path (path)}
       <li>

@@ -8,10 +8,11 @@
   import { invoke } from '@tauri-apps/api/core'
   import { listen } from '@tauri-apps/api/event'
   import {
-    content, currentFile, currentFolder, files, dirty, statusMsg, editorScroll,
+    content, currentFile, dirty, statusMsg, editorScroll,
     sidebarCollapsed, editorCollapsed, previewCollapsed, previewZoom, reloadTrigger,
   } from '$lib/stores'
-  import { writeFile, listMarkdownFiles, readFile } from '$lib/tauri'
+  import { writeFile, readFile } from '$lib/tauri'
+  import { loadFile } from '$lib/workspace'
   import { loadZoom, setZoom, nudgeZoom } from '$lib/zoom'
   import '@fontsource/press-start-2p/400.css'
   import '@fontsource/vt323/400.css'
@@ -40,23 +41,6 @@
     if (path) invoke('watch_file', { path }).catch(() => {})
     else invoke('unwatch_file').catch(() => {})
   })
-
-  async function loadFile(path: string) {
-    const dir = path.replace(/[\\/][^\\/]*$/, '')
-    currentFolder.set(dir)
-    try {
-      files.set(await listMarkdownFiles(dir))
-    } catch (e) {
-      statusMsg.set(`Could not list folder: ${e}`)
-    }
-    try {
-      content.set(await readFile(path))
-      currentFile.set(path)
-      dirty.set(false)
-    } catch (e) {
-      statusMsg.set(`Could not open file: ${e}`)
-    }
-  }
 
   // Load a file passed on launch (Windows: CLI arg, macOS: Apple Events).
   // Also listen for files opened while the app is already running (macOS Finder).
