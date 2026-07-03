@@ -119,6 +119,14 @@ fn read_file(path: String) -> Result<String, String> {
     std::fs::read_to_string(&path).map_err(|e| e.to_string())
 }
 
+/// Resolve a relative `.md` link clicked in the preview to an absolute path,
+/// or `None` if it doesn't point at an existing markdown file.
+#[tauri::command]
+fn resolve_md_link(base: String, href: String) -> Option<String> {
+    files::resolve_md_link(std::path::Path::new(&base), &href)
+        .map(|p| p.to_string_lossy().to_string())
+}
+
 /// The markdown file passed on launch — via Apple Events on macOS or CLI args on Windows.
 #[tauri::command]
 fn get_startup_file(state: tauri::State<OpenedFile>) -> Option<String> {
@@ -229,6 +237,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             list_markdown_files,
             read_file,
+            resolve_md_link,
             write_file,
             watch_file,
             unwatch_file,
