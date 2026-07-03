@@ -33,6 +33,8 @@ const STARTER_THEMES: &[(&str, &str)] = &[
     ("velvet-dark.css", include_str!("../themes/velvet-dark.css")),
     ("glacier-dark.css", include_str!("../themes/glacier-dark.css")),
     ("blueprint-dark.css", include_str!("../themes/blueprint-dark.css")),
+    ("groovy-dark.css", include_str!("../themes/groovy-dark.css")),
+    ("groovy-light.css", include_str!("../themes/groovy-light.css")),
 ];
 
 /// Pre-v2 starter filenames removed on seed so they don't linger alongside the new set.
