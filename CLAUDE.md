@@ -61,7 +61,7 @@ A theme is **one `.css` file** with a header comment (`/* @name X */`, `/* @mode
 - On startup `seed_themes` writes them to `%APPDATA%/com.hartye.slate/themes/` (or OS equivalent), **refreshing bundled themes when their content changes** but never touching user-authored files. `RETIRED_STARTERS` deletes obsolete bundled filenames.
 - `list_themes` reads that directory at runtime, so dropping a new `.css` there adds a theme without rebuilding.
 
-**To add or edit a bundled theme:** add the file to `src-tauri/themes/`, register it in `STARTER_THEMES` in `lib.rs`. Keep the full variable contract complete (the `--code-*` set in `export.ts`'s `BASE_PROSE` is the source of truth for which highlight tokens themes are expected to define). `dark`-mode themes also drive mermaid's base theme.
+**To add or edit a bundled theme:** add the file to `src-tauri/themes/`, register it in `STARTER_THEMES` in `lib.rs`, and give the family a `META` entry in `ThemePanel.svelte`. Keep the full variable contract complete (`src/lib/styles/prose.css` — shared by the in-app preview and the browser export — is the source of truth for which `--code-*` highlight tokens themes are expected to define). `dark`-mode themes also drive mermaid's base theme. App-bundled fonts referenced by a theme's font variables are inlined into the browser export automatically (`collectThemeFontCss`); system-installed fonts (e.g. Nerd Fonts) are referenced by name and fall back gracefully.
 
 ## Conventions
 
