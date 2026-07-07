@@ -10,6 +10,7 @@
   import { listThemes, applyThemeVariant, savedThemeChoice, type Theme } from '$lib/theme'
   import { renderMarkdown } from '$lib/markdown'
   import { buildStandaloneHtml, collectThemeFontCss } from '$lib/export'
+  import { inlineLocalImages } from '$lib/images'
   import ThemePanel from './ThemePanel.svelte'
 
   let panelOpen = $state(false)
@@ -33,8 +34,17 @@
   async function openInBrowser() {
     const theme = $themes.find((t) => t.name === $activeThemeName && t.mode === $activeMode)
     const fontCss = await collectThemeFontCss(theme?.css ?? '')
+    let bodyHtml = renderMarkdown($content)
+    if ($currentFile) {
+      // Inline relative images into the raw HTML (via a detached container)
+      // so the exported standalone page carries them instead of broken links.
+      const scratch = document.createElement('div')
+      scratch.innerHTML = bodyHtml
+      await inlineLocalImages(scratch, $currentFile)
+      bodyHtml = scratch.innerHTML
+    }
     const html = buildStandaloneHtml(
-      renderMarkdown($content),
+      bodyHtml,
       theme?.css ?? '',
       $currentFile ? baseName($currentFile) : 'Slate',
       fontCss,

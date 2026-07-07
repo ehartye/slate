@@ -24,28 +24,65 @@ pub fn markdown_files_in(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
     Ok(out)
 }
 
+/// Join `href` onto `base_file`'s parent dir and canonicalize, but only if the
+/// result exists as a file. Shared groundwork for the link/image resolvers below.
+fn resolve_relative_existing(base_file: &Path, href: &str) -> Option<PathBuf> {
+    let parent = base_file.parent()?;
+    let joined = parent.join(href);
+    let resolved = strip_verbatim(joined.canonicalize().ok()?);
+    if resolved.is_file() {
+        Some(resolved)
+    } else {
+        None
+    }
+}
+
+fn has_extension(path: &Path, exts: &[&str]) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .map(|e| exts.contains(&e.to_ascii_lowercase().as_str()))
+        .unwrap_or(false)
+}
+
+const MD_EXTENSIONS: &[&str] = &["md", "markdown"];
+
+/// Image extensions supported for inline preview/export. Kept in sync with
+/// `image_mime` below — every extension here must have a mapped MIME type.
+pub const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "ico"];
+
 /// Resolve a relative link `href` (from a markdown file at `base_file`) to an
 /// absolute path, but only if it points at an existing `.md`/`.markdown` file.
 /// Returns `None` for missing files, non-markdown targets, or absolute/URL hrefs.
 pub fn resolve_md_link(base_file: &Path, href: &str) -> Option<PathBuf> {
-    let parent = base_file.parent()?;
-    let joined = parent.join(href);
-    let resolved = strip_verbatim(joined.canonicalize().ok()?);
-    if !resolved.is_file() {
-        return None;
-    }
-    let is_md = resolved
+    let resolved = resolve_relative_existing(base_file, href)?;
+    has_extension(&resolved, MD_EXTENSIONS).then_some(resolved)
+}
+
+/// Resolve a relative image `href` (from a markdown file at `base_file`) to an
+/// absolute path, but only if it points at an existing supported image file.
+pub fn resolve_image_link(base_file: &Path, href: &str) -> Option<PathBuf> {
+    let resolved = resolve_relative_existing(base_file, href)?;
+    has_extension(&resolved, IMAGE_EXTENSIONS).then_some(resolved)
+}
+
+/// MIME type for an image path, by extension. Falls back to a generic octet
+/// stream for anything outside `IMAGE_EXTENSIONS` (shouldn't happen given
+/// callers filter through `resolve_image_link` first).
+pub fn image_mime(path: &Path) -> &'static str {
+    match path
         .extension()
         .and_then(|e| e.to_str())
-        .map(|e| {
-            let e = e.to_ascii_lowercase();
-            e == "md" || e == "markdown"
-        })
-        .unwrap_or(false);
-    if is_md {
-        Some(resolved)
-    } else {
-        None
+        .map(|e| e.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("png") => "image/png",
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("gif") => "image/gif",
+        Some("webp") => "image/webp",
+        Some("bmp") => "image/bmp",
+        Some("svg") => "image/svg+xml",
+        Some("ico") => "image/x-icon",
+        _ => "application/octet-stream",
     }
 }
 
@@ -155,6 +192,42 @@ mod tests {
         let got = resolve_md_link(&base, "../up.md").unwrap();
         let want = strip_verbatim(dir.path().join("up.md").canonicalize().unwrap());
         assert_eq!(got, want);
+    }
+
+    #[test]
+    fn resolves_existing_sibling_image() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path().join("index.md");
+        fs::write(&base, "x").unwrap();
+        fs::write(dir.path().join("diagram.PNG"), "y").unwrap();
+
+        let got = resolve_image_link(&base, "diagram.PNG").unwrap();
+        let want = strip_verbatim(dir.path().join("diagram.PNG").canonicalize().unwrap());
+        assert_eq!(got, want);
+    }
+
+    #[test]
+    fn rejects_missing_and_non_image_images() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path().join("index.md");
+        fs::write(&base, "x").unwrap();
+        fs::write(dir.path().join("notes.md"), "y").unwrap();
+
+        assert!(resolve_image_link(&base, "missing.png").is_none());
+        assert!(resolve_image_link(&base, "notes.md").is_none());
+    }
+
+    #[test]
+    fn maps_image_mime_types() {
+        assert_eq!(image_mime(Path::new("a.png")), "image/png");
+        assert_eq!(image_mime(Path::new("a.JPG")), "image/jpeg");
+        assert_eq!(image_mime(Path::new("a.jpeg")), "image/jpeg");
+        assert_eq!(image_mime(Path::new("a.gif")), "image/gif");
+        assert_eq!(image_mime(Path::new("a.webp")), "image/webp");
+        assert_eq!(image_mime(Path::new("a.bmp")), "image/bmp");
+        assert_eq!(image_mime(Path::new("a.svg")), "image/svg+xml");
+        assert_eq!(image_mime(Path::new("a.ico")), "image/x-icon");
+        assert_eq!(image_mime(Path::new("a.xyz")), "application/octet-stream");
     }
 
     #[test]

@@ -13,6 +13,7 @@ export const previewZoom = writable<number>(1)        // preview render scale, p
 
 // Layout collapse state
 export const sidebarCollapsed = writable<boolean>(false)
+export const sidebarWidth = writable<number>(220)     // file browser panel width, persisted
 export const editorCollapsed = writable<boolean>(false)
 export const previewCollapsed = writable<boolean>(false)
 
