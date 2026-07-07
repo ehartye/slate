@@ -10,7 +10,7 @@
   import {
     content, currentFile, dirty, statusMsg, editorScroll,
     sidebarCollapsed, editorCollapsed, previewCollapsed, previewZoom, reloadTrigger,
-    sidebarWidth,
+    sidebarWidth, findOpen,
   } from '$lib/stores'
   import { writeFile, readFile } from '$lib/tauri'
   import { loadFile } from '$lib/workspace'
@@ -159,6 +159,10 @@
     } else if (e.key === '0') {
       e.preventDefault()
       setZoom(1)
+    } else if (e.key.toLowerCase() === 'f') {
+      e.preventDefault()
+      if ($previewCollapsed) previewCollapsed.set(false)
+      findOpen.set(true)
     }
   }
 </script>
