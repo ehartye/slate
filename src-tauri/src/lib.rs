@@ -139,6 +139,22 @@ fn resolve_md_link(base: String, href: String) -> Option<String> {
         .map(|p| p.to_string_lossy().to_string())
 }
 
+/// Resolve a relative image `href` (from the markdown file at `base`) and read
+/// it as a `data:` URL, so the preview and the standalone-HTML export can embed
+/// it without needing filesystem/asset-protocol access from the webview.
+/// Returns `Ok(None)` if `href` isn't a relative path to an existing supported
+/// image file (missing file, non-image extension, or already an absolute/URL href).
+#[tauri::command]
+fn resolve_image_data_url(base: String, href: String) -> Result<Option<String>, String> {
+    let Some(path) = files::resolve_image_link(std::path::Path::new(&base), &href) else {
+        return Ok(None);
+    };
+    let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
+    let mime = files::image_mime(&path);
+    let b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, bytes);
+    Ok(Some(format!("data:{mime};base64,{b64}")))
+}
+
 /// The markdown file passed on launch — via Apple Events on macOS or CLI args on Windows.
 #[tauri::command]
 fn get_startup_file(state: tauri::State<OpenedFile>) -> Option<String> {
@@ -250,6 +266,7 @@ pub fn run() {
             list_markdown_files,
             read_file,
             resolve_md_link,
+            resolve_image_data_url,
             write_file,
             watch_file,
             unwatch_file,

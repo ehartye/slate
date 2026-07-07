@@ -1,6 +1,6 @@
 <script lang="ts">
   import { open } from '@tauri-apps/plugin-dialog'
-  import { currentFolder, files, currentFile, content, dirty, statusMsg } from '$lib/stores'
+  import { currentFolder, files, currentFile, content, dirty, statusMsg, sidebarWidth } from '$lib/stores'
   import { listMarkdownFiles, readFile, baseName } from '$lib/tauri'
   import { loadFile, refreshWorkspace } from '$lib/workspace'
 
@@ -35,7 +35,7 @@
   }
 </script>
 
-<aside class="sidebar">
+<aside class="sidebar" style="width: {$sidebarWidth}px">
   <div class="sidebar-head">
     <button class="folder-btn" onclick={chooseFolder} title="Choose folder…">
       {$currentFolder ? baseName($currentFolder) : 'Choose folder…'}

@@ -10,10 +10,13 @@
   import {
     content, currentFile, dirty, statusMsg, editorScroll,
     sidebarCollapsed, editorCollapsed, previewCollapsed, previewZoom, reloadTrigger,
+    sidebarWidth,
   } from '$lib/stores'
   import { writeFile, readFile } from '$lib/tauri'
   import { loadFile } from '$lib/workspace'
   import { loadZoom, setZoom, nudgeZoom } from '$lib/zoom'
+  import { loadSidebarWidth, clampSidebarWidth, persistSidebarWidth } from '$lib/sidebarWidth'
+  import { clearImageCache } from '$lib/images'
   import '@fontsource/press-start-2p/400.css'
   import '@fontsource/vt323/400.css'
   import '@fontsource/ibm-plex-mono/400.css'
@@ -36,6 +39,7 @@
 
   // Restore the remembered preview zoom.
   previewZoom.set(loadZoom())
+  sidebarWidth.set(loadSidebarWidth())
 
   // Keep the file watcher in sync with whichever file is open.
   $effect(() => {
@@ -65,6 +69,7 @@
       }
       try {
         content.set(await readFile(event.payload))
+        clearImageCache()
         reloadTrigger.update(n => n + 1)
         statusMsg.set('Reloaded from disk')
       } catch (e) {
@@ -86,6 +91,22 @@
     function up() {
       window.removeEventListener('mousemove', move)
       window.removeEventListener('mouseup', up)
+    }
+    window.addEventListener('mousemove', move)
+    window.addEventListener('mouseup', up)
+  }
+
+  function startSidebarDrag(e: MouseEvent) {
+    e.preventDefault()
+    const sidebarEl = (e.currentTarget as HTMLElement).previousElementSibling as HTMLElement
+    const rect = sidebarEl.getBoundingClientRect()
+    function move(ev: MouseEvent) {
+      sidebarWidth.set(clampSidebarWidth(ev.clientX - rect.left))
+    }
+    function up() {
+      window.removeEventListener('mousemove', move)
+      window.removeEventListener('mouseup', up)
+      persistSidebarWidth()
     }
     window.addEventListener('mousemove', move)
     window.addEventListener('mouseup', up)
@@ -147,7 +168,11 @@
 <div class="app">
   <Toolbar />
   <div class="body">
-    {#if !$sidebarCollapsed}<Sidebar />{/if}
+    {#if !$sidebarCollapsed}
+      <Sidebar />
+      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+      <div class="sidebar-divider" onmousedown={startSidebarDrag} role="separator" aria-orientation="vertical" aria-label="Resize file browser"></div>
+    {/if}
     <div class="split">
       {#if $editorCollapsed}
         <button class="rail" onclick={() => editorCollapsed.set(false)} title="Expand editor">

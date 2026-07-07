@@ -5,6 +5,7 @@
   } from '$lib/stores'
   import { renderMarkdown } from '$lib/markdown'
   import { resolveMdLink, readFile, listMarkdownFiles, dirName } from '$lib/tauri'
+  import { inlineLocalImages } from '$lib/images'
   import { openUrl } from '@tauri-apps/plugin-opener'
   import mermaid from 'mermaid'
   import 'katex/dist/katex.min.css'
@@ -33,6 +34,16 @@
     queueMicrotask(() => {
       mermaid.run({ nodes }).catch(() => { /* leave source visible on error */ })
     })
+  })
+
+  // After HTML updates, inline local relative-path images as data URLs so
+  // `![alt](diagram.png)` renders (the webview can't resolve a bare relative
+  // path against the source file's directory on its own).
+  $effect(() => {
+    void html
+    const base = $currentFile
+    if (!container || !base) return
+    inlineLocalImages(container, base).catch(() => { /* leave broken images as-is */ })
   })
 
   // Load a document into the app (shared shape with the sidebar's open).

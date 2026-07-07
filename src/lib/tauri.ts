@@ -13,6 +13,11 @@ export const writeFile = (path: string, content: string) =>
 export const resolveMdLink = (base: string, href: string) =>
   invoke<string | null>('resolve_md_link', { base, href })
 
+/** Resolve a relative image `href` in `base` and read it as a `data:` URL, or
+ *  null if it's missing, absolute/remote, or not a supported image type. */
+export const resolveImageDataUrl = (base: string, href: string) =>
+  invoke<string | null>('resolve_image_data_url', { base, href })
+
 /** File name from a full path (handles \\ and /). */
 export const baseName = (path: string) => path.split(/[\\/]/).pop() ?? path
 
