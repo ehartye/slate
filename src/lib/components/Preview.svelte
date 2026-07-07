@@ -2,13 +2,16 @@
   import {
     content, activeMermaidMode, previewZoom,
     currentFile, currentFolder, files, dirty, statusMsg,
+    findOpen, findQuery, findActiveIndex, findMatchCount,
   } from '$lib/stores'
   import { renderMarkdown } from '$lib/markdown'
   import { resolveMdLink, readFile, listMarkdownFiles, dirName } from '$lib/tauri'
   import { inlineLocalImages } from '$lib/images'
+  import { highlightMatches, clearHighlights, setActiveMatch } from '$lib/documentSearch'
   import { openUrl } from '@tauri-apps/plugin-opener'
   import mermaid from 'mermaid'
   import 'katex/dist/katex.min.css'
+  import FindBar from './FindBar.svelte'
   // No hljs stylesheet import — code token colors come from the active theme's
   // --code-* CSS variables (mapped in base.css), so highlighting follows the theme.
 
@@ -44,6 +47,35 @@
     const base = $currentFile
     if (!container || !base) return
     inlineLocalImages(container, base).catch(() => { /* leave broken images as-is */ })
+  })
+
+  // Recompute find-in-document highlights whenever the rendered content or
+  // the query changes (or the bar closes, which clears them). Always starts
+  // back at the first match — same as a browser's find-on-page behavior.
+  $effect(() => {
+    void html
+    const query = $findOpen ? $findQuery : ''
+    if (!container) return
+    clearHighlights(container)
+    const count = query ? highlightMatches(container, query) : 0
+    findMatchCount.set(count)
+    findActiveIndex.set(0)
+  })
+
+  // Move the active-match highlight (and scroll it into view) when the
+  // current index changes, e.g. via the find bar's next/prev.
+  $effect(() => {
+    const idx = $findActiveIndex
+    if (!container || $findMatchCount === 0) return
+    setActiveMatch(container, idx)
+  })
+
+  // Close the find bar and drop any highlights when switching documents —
+  // matches from the previous file aren't meaningful here.
+  $effect(() => {
+    void $currentFile
+    findOpen.set(false)
+    findQuery.set('')
   })
 
   // Load a document into the app (shared shape with the sidebar's open).
@@ -112,6 +144,7 @@
   }
 </script>
 
+<FindBar />
 <div
   class="preview"
   bind:this={container}

@@ -23,3 +23,9 @@ export const activeThemeName = writable<string | null>(null) // active family
 export const activeMode = writable<'light' | 'dark'>('dark')
 // Mermaid base mode, derived from the active theme's mode.
 export const activeMermaidMode = writable<'default' | 'dark'>('dark')
+
+// In-document find (Ctrl/Cmd+F), scoped to the rendered Preview pane.
+export const findOpen = writable<boolean>(false)
+export const findQuery = writable<string>('')
+export const findActiveIndex = writable<number>(0)
+export const findMatchCount = writable<number>(0)

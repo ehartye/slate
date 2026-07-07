@@ -170,6 +170,22 @@ body { font-family: var(--ui-font); color: var(--fg); background: var(--bg); }
 /* All .preview / .front-matter rendered-markdown rules live in prose.css
    (@import at top), shared with the browser export. */
 
+/* ── Find in document ──────────────────────────────────── */
+.find-bar { position: fixed; top: 50px; right: 14px; z-index: 999; display: flex; align-items: center;
+  gap: 8px; padding: 7px 9px; background: var(--bg-elevated); border: 1px solid var(--border);
+  border-radius: 10px; box-shadow: var(--shadow); }
+.find-bar input { background: var(--bg); color: var(--fg); border: 1px solid var(--border);
+  border-radius: 6px; padding: 5px 9px; font: inherit; font-size: 12.5px; width: 190px; }
+.find-bar input:focus { outline: none; border-color: var(--accent); }
+.find-count { font-size: 11.5px; color: var(--fg-muted); min-width: 3.5em; text-align: center; }
+.find-nav, .find-close { background: none; color: var(--fg); border: 1px solid var(--border);
+  border-radius: 6px; width: 24px; height: 24px; cursor: pointer; font: inherit; font-size: 13px;
+  display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+.find-nav:hover:not(:disabled), .find-close:hover { border-color: var(--accent); color: var(--accent); }
+.find-nav:disabled { opacity: 0.4; cursor: default; }
+mark.find-hit { background: var(--accent-soft); color: inherit; border-radius: 2px; }
+mark.find-hit-active { background: var(--accent); color: var(--bg); }
+
 /* ── Status bar ────────────────────────────────────────── */
 .statusbar { display: flex; align-items: center; gap: 14px; padding: 5px 14px;
   background: var(--bg-elevated); border-top: 1px solid var(--border); color: var(--fg-muted); font-size: 11.5px; }
