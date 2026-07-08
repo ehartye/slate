@@ -123,6 +123,9 @@ body { font-family: var(--ui-font); color: var(--fg); background: var(--bg); }
 .sidebar li button:hover { background: var(--accent-soft); }
 .sidebar li button.active { background: var(--accent-soft); color: var(--accent);
   box-shadow: inset 2px 0 0 var(--accent); font-weight: 600; }
+.sidebar li button.folder-row { color: var(--fg-muted); display: flex; align-items: center; gap: 6px; }
+.sidebar li button.folder-row:hover { color: var(--fg); }
+.row-icon { font-size: 12px; line-height: 1; flex: 0 0 auto; }
 
 /* ── Editor / preview split ────────────────────────────── */
 .split { flex: 1; display: flex; min-width: 0; }
@@ -154,6 +157,8 @@ body { font-family: var(--ui-font); color: var(--fg); background: var(--bg); }
   padding: 2px 7px; border-radius: 6px; font-size: 14px; line-height: 1; }
 .collapse-btn:hover, .icon-btn:hover { color: var(--accent); background: var(--accent-soft); }
 .icon-btn.off { color: var(--fg-muted); opacity: 0.55; }
+.icon-btn:disabled { opacity: 0.35; cursor: default; }
+.icon-btn:disabled:hover { color: var(--fg-muted); background: none; }
 .sidebar-toggle { display: inline-flex; align-items: center; padding: 5px 6px; }
 .sidebar-toggle svg { display: block; }
 .rail { flex: 0 0 auto; width: 34px; background: var(--bg-elevated); border: 0; cursor: pointer;

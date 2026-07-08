@@ -127,6 +127,15 @@ fn list_markdown_files(folder: String) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
+fn list_subfolders(folder: String) -> Result<Vec<String>, String> {
+    let paths = files::subfolders_in(std::path::Path::new(&folder)).map_err(|e| e.to_string())?;
+    Ok(paths
+        .into_iter()
+        .map(|p| p.to_string_lossy().to_string())
+        .collect())
+}
+
+#[tauri::command]
 fn read_file(path: String) -> Result<String, String> {
     std::fs::read_to_string(&path).map_err(|e| e.to_string())
 }
@@ -264,6 +273,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             list_markdown_files,
+            list_subfolders,
             read_file,
             resolve_md_link,
             resolve_image_data_url,

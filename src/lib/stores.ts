@@ -3,6 +3,7 @@ import type { Theme } from './theme'
 
 export const currentFolder = writable<string | null>(null)
 export const files = writable<string[]>([])          // full paths
+export const folders = writable<string[]>([])         // subfolders of currentFolder, full paths
 export const currentFile = writable<string | null>(null)
 export const content = writable<string>('')           // editor text
 export const dirty = writable<boolean>(false)
