@@ -3,6 +3,9 @@ import { invoke } from '@tauri-apps/api/core'
 export const listMarkdownFiles = (folder: string) =>
   invoke<string[]>('list_markdown_files', { folder })
 
+export const listSubfolders = (folder: string) =>
+  invoke<string[]>('list_subfolders', { folder })
+
 export const readFile = (path: string) => invoke<string>('read_file', { path })
 
 export const writeFile = (path: string, content: string) =>

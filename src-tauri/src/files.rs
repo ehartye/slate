@@ -24,6 +24,29 @@ pub fn markdown_files_in(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
     Ok(out)
 }
 
+/// Return absolute paths of immediate subdirectories of `dir`, sorted by
+/// name, skipping hidden (dot-prefixed) directories like `.git`.
+pub fn subfolders_in(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
+    let mut out: Vec<PathBuf> = Vec::new();
+    for entry in std::fs::read_dir(dir)? {
+        let path = entry?.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let hidden = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .map(|n| n.starts_with('.'))
+            .unwrap_or(false);
+        if hidden {
+            continue;
+        }
+        out.push(path);
+    }
+    out.sort_by_key(|p| p.file_name().map(|n| n.to_ascii_lowercase()));
+    Ok(out)
+}
+
 /// Join `href` onto `base_file`'s parent dir and canonicalize, but only if the
 /// result exists as a file. Shared groundwork for the link/image resolvers below.
 fn resolve_relative_existing(base_file: &Path, href: &str) -> Option<PathBuf> {
@@ -162,6 +185,22 @@ mod tests {
             .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
             .collect();
         assert_eq!(names, vec!["a.MD", "b.md", "note.markdown"]);
+    }
+
+    #[test]
+    fn lists_only_visible_subdirs_sorted() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::create_dir(dir.path().join("Zeta")).unwrap();
+        fs::create_dir(dir.path().join("alpha")).unwrap();
+        fs::create_dir(dir.path().join(".git")).unwrap();
+        fs::write(dir.path().join("note.md"), "x").unwrap();
+
+        let dirs = subfolders_in(dir.path()).unwrap();
+        let names: Vec<String> = dirs
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+        assert_eq!(names, vec!["alpha", "Zeta"]);
     }
 
     #[test]
