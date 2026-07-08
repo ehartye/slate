@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { buildStandaloneHtml, themeFontFamilies } from '../src/lib/export'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { buildStandaloneHtml, themeFontFamilies, collectMermaidScript } from '../src/lib/export'
 
 describe('buildStandaloneHtml', () => {
   it('embeds rendered body, theme css, and title', () => {
@@ -14,6 +14,21 @@ describe('buildStandaloneHtml', () => {
   it('embeds font css when provided', () => {
     const out = buildStandaloneHtml('<p>x</p>', '', 't', '@font-face{font-family:Orbitron}')
     expect(out).toContain('@font-face{font-family:Orbitron}')
+  })
+
+  it('omits any mermaid script tag when no mermaid bundle is passed', () => {
+    const out = buildStandaloneHtml('<pre class="mermaid">graph TD;A--&gt;B</pre>', '', 't')
+    expect(out).not.toContain('window.mermaid')
+  })
+
+  it('embeds the mermaid bundle and a bootstrap script when provided', () => {
+    const out = buildStandaloneHtml('<pre class="mermaid">graph TD;A--&gt;B</pre>', '', 't', '', {
+      script: 'globalThis.mermaid = {};',
+      theme: 'dark',
+    })
+    expect(out).toContain('globalThis.mermaid = {};')
+    expect(out).toContain("window.mermaid.initialize({ startOnLoad: false, theme: \"dark\" })")
+    expect(out).toContain("window.mermaid.run({ querySelector: 'pre.mermaid' })")
   })
 })
 
@@ -42,5 +57,33 @@ describe('themeFontFamilies', () => {
 
   it('returns empty for css without font variables', () => {
     expect(themeFontFamilies(':root{--bg:#000}')).toEqual([])
+  })
+})
+
+describe('collectMermaidScript', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('returns the fetched bundle text', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve('MERMAID_BUNDLE') }))
+    expect(await collectMermaidScript()).toBe('MERMAID_BUNDLE')
+  })
+
+  it('escapes literal </script sequences so the bundle cannot break out of its <script> tag', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve('a</script>b') }))
+    const script = await collectMermaidScript()
+    expect(script).not.toContain('</script>')
+    expect(script).toContain('<\\/script>')
+  })
+
+  it('returns empty string when the fetch response is not ok', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
+    expect(await collectMermaidScript()).toBe('')
+  })
+
+  it('returns empty string when fetch throws', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network')))
+    expect(await collectMermaidScript()).toBe('')
   })
 })
