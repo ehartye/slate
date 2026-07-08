@@ -3,13 +3,13 @@
   import { invoke } from '@tauri-apps/api/core'
   import {
     currentFile, currentFolder, content, dirty,
-    themes, activeThemeName, activeMode,
+    themes, activeThemeName, activeMode, activeMermaidMode,
     sidebarCollapsed,
   } from '$lib/stores'
   import { baseName } from '$lib/tauri'
   import { listThemes, applyThemeVariant, savedThemeChoice, type Theme } from '$lib/theme'
   import { renderMarkdown } from '$lib/markdown'
-  import { buildStandaloneHtml, collectThemeFontCss } from '$lib/export'
+  import { buildStandaloneHtml, collectThemeFontCss, collectMermaidScript } from '$lib/export'
   import { inlineLocalImages } from '$lib/images'
   import ThemePanel from './ThemePanel.svelte'
 
@@ -43,11 +43,16 @@
       await inlineLocalImages(scratch, $currentFile)
       bodyHtml = scratch.innerHTML
     }
+    // Only fetch mermaid's ~3.5MB bundle when the document actually has a
+    // diagram to render — most exports won't pay that cost at all.
+    const hasMermaid = /class="mermaid"/.test(bodyHtml)
+    const mermaidScript = hasMermaid ? await collectMermaidScript() : ''
     const html = buildStandaloneHtml(
       bodyHtml,
       theme?.css ?? '',
       $currentFile ? baseName($currentFile) : 'Slate',
       fontCss,
+      mermaidScript ? { script: mermaidScript, theme: $activeMermaidMode } : null,
     )
     await invoke('open_in_browser', { html })
   }

@@ -1,5 +1,9 @@
 import katexCss from 'katex/dist/katex.min.css?inline'
 import proseCss from './styles/prose.css?inline'
+// `?url` (not `?raw`/inline) so the ~3.5MB minified bundle is emitted as a
+// separate asset and only ever fetched on demand (see collectMermaidScript),
+// instead of bloating the app's own JS bundle that every launch has to load.
+import mermaidScriptUrl from 'mermaid/dist/mermaid.min.js?url'
 
 // .preview prose styling is the shared prose.css (same rules the in-app preview
 // uses, so the two never drift). Only the standalone-page container differs:
@@ -76,12 +80,43 @@ export async function collectThemeFontCss(themeCss: string): Promise<string> {
   return out
 }
 
+/**
+ * Fetch mermaid's browser-ready UMD bundle (the same one `<script src>` CDN
+ * usage would load) so diagrams can render in the exported standalone page,
+ * which has no Vite/ESM pipeline of its own to resolve the app's `import
+ * mermaid from 'mermaid'`. Returns '' (and the caller should skip embedding
+ * entirely) if the fetch fails — the exported page then falls back to
+ * showing the raw ```mermaid source text, same as before this existed.
+ */
+export async function collectMermaidScript(): Promise<string> {
+  try {
+    const res = await fetch(mermaidScriptUrl)
+    if (!res.ok) return ''
+    // Defensively escape any literal `</script` so the minified bundle can't
+    // prematurely close the <script> tag it's about to be embedded in.
+    return (await res.text()).replace(/<\/script/gi, '<\\/script')
+  } catch {
+    return ''
+  }
+}
+
 export function buildStandaloneHtml(
   bodyHtml: string,
   themeCss: string,
   title: string,
   fontCss = '',
+  mermaid: { script: string; theme: 'default' | 'dark' } | null = null,
 ): string {
+  const mermaidTag = mermaid?.script
+    ? `<script>${mermaid.script}</script>
+<script>
+window.addEventListener('DOMContentLoaded', function () {
+  if (!window.mermaid) return;
+  window.mermaid.initialize({ startOnLoad: false, theme: ${JSON.stringify(mermaid.theme)} });
+  window.mermaid.run({ querySelector: 'pre.mermaid' });
+});
+</script>`
+    : ''
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>${title}</title>
 <style>${fontCss}</style>
@@ -89,5 +124,5 @@ export function buildStandaloneHtml(
 <style>${katexCss}</style>
 <style>${proseCss}</style>
 <style>${CONTAINER}</style>
-</head><body><div class="preview">${bodyHtml}</div></body></html>`
+</head><body><div class="preview">${bodyHtml}</div>${mermaidTag}</body></html>`
 }
