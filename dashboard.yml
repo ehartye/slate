@@ -1,0 +1,7 @@
+title: Slate
+blurb: A quiet desktop app for writing and reading notes and documents.
+tags: [tool]
+setup: npm install
+server:
+  command: npm run dev
+  port: 5288
