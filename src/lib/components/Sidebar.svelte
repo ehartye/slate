@@ -1,5 +1,6 @@
 <script lang="ts">
   import { open } from '@tauri-apps/plugin-dialog'
+  import { revealItemInDir } from '@tauri-apps/plugin-opener'
   import { currentFolder, files, folders, currentFile, content, dirty, statusMsg, sidebarWidth } from '$lib/stores'
   import { readFile, baseName, dirName } from '$lib/tauri'
   import { loadFile, refreshWorkspace, browseFolder, folderUp } from '$lib/workspace'
@@ -7,6 +8,8 @@
   // The up button is enabled only when the current folder actually has a
   // parent to navigate to (e.g. disabled at a filesystem root).
   let canGoUp = $derived(!!$currentFolder && !!dirName($currentFolder))
+
+  let contextMenu = $state<{ x: number; y: number; path: string } | null>(null)
 
   async function chooseFolder() {
     const picked = await open({ directory: true })
@@ -32,7 +35,31 @@
       statusMsg.set(`Could not open file: ${e}`)
     }
   }
+
+  function showContextMenu(e: MouseEvent, path: string) {
+    e.preventDefault()
+    contextMenu = { x: e.clientX, y: e.clientY, path }
+  }
+
+  function closeContextMenu() {
+    contextMenu = null
+  }
+
+  async function revealInFileExplorer(path: string) {
+    closeContextMenu()
+    try {
+      await revealItemInDir(path)
+    } catch (e) {
+      statusMsg.set(`Could not open file explorer: ${e}`)
+    }
+  }
 </script>
+
+<svelte:window
+  onclick={closeContextMenu}
+  onkeydown={(e) => { if (e.key === 'Escape') closeContextMenu() }}
+/>
+
 
 <aside class="sidebar" style="width: {$sidebarWidth}px">
   <div class="sidebar-head">
@@ -59,10 +86,20 @@
     {/each}
     {#each $files as path (path)}
       <li>
-        <button class:active={$currentFile === path} onclick={() => openFile(path)}>
+        <button
+          class:active={$currentFile === path}
+          onclick={() => openFile(path)}
+          oncontextmenu={(e) => showContextMenu(e, path)}
+        >
           {baseName(path)}
         </button>
       </li>
     {/each}
   </ul>
+
+  {#if contextMenu}
+    <div class="context-menu" style="left: {contextMenu.x}px; top: {contextMenu.y}px">
+      <button onclick={() => revealInFileExplorer(contextMenu!.path)}>Open in File Explorer</button>
+    </div>
+  {/if}
 </aside>

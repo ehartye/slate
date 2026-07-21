@@ -6,6 +6,9 @@ export const listMarkdownFiles = (folder: string) =>
 export const listSubfolders = (folder: string) =>
   invoke<string[]>('list_subfolders', { folder })
 
+/** Open another independent Slate window (blank — no folder/file pre-selected). */
+export const openNewWindow = () => invoke<void>('open_new_window')
+
 export const readFile = (path: string) => invoke<string>('read_file', { path })
 
 export const writeFile = (path: string, content: string) =>

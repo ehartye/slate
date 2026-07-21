@@ -4,9 +4,9 @@
   import {
     currentFile, currentFolder, content, dirty,
     themes, activeThemeName, activeMode, activeMermaidMode,
-    sidebarCollapsed,
+    sidebarCollapsed, statusMsg,
   } from '$lib/stores'
-  import { baseName } from '$lib/tauri'
+  import { baseName, openNewWindow } from '$lib/tauri'
   import { listThemes, applyThemeVariant, savedThemeChoice, type Theme } from '$lib/theme'
   import { renderMarkdown } from '$lib/markdown'
   import { buildStandaloneHtml, collectThemeFontCss, collectMermaidScript } from '$lib/export'
@@ -56,6 +56,14 @@
     )
     await invoke('open_in_browser', { html })
   }
+
+  async function newWindow() {
+    try {
+      await openNewWindow()
+    } catch (e) {
+      statusMsg.set(`Could not open new window: ${e}`)
+    }
+  }
 </script>
 
 <header class="toolbar">
@@ -85,6 +93,10 @@
   {#if $currentFolder}<span class="muted">{$currentFolder}</span>{/if}
 
   <span class="spacer"></span>
+
+  <button class="browser-btn" onclick={newWindow} title="Open a new Slate window (Ctrl/Cmd+N)">
+    New window
+  </button>
 
   <button class="browser-btn" onclick={openInBrowser} title="Open the rendered document in your browser">
     Open in browser <span class="arrow">↗</span>
