@@ -129,9 +129,21 @@ fn list_themes(app: tauri::AppHandle) -> Result<Vec<ThemeInfo>, String> {
 }
 
 #[tauri::command]
-fn list_markdown_files(folder: String) -> Result<Vec<String>, String> {
-    let paths =
-        files::markdown_files_in(std::path::Path::new(&folder)).map_err(|e| e.to_string())?;
+fn list_markdown_files(folder: String, show_hidden: bool) -> Result<Vec<String>, String> {
+    let paths = files::markdown_files_in(std::path::Path::new(&folder), show_hidden)
+        .map_err(|e| e.to_string())?;
+    Ok(paths
+        .into_iter()
+        .map(|p| p.to_string_lossy().to_string())
+        .collect())
+}
+
+/// Listing used when "Markdown only" mode is off: every recognized text/code
+/// file, not just `.md`/`.markdown`.
+#[tauri::command]
+fn list_text_files(folder: String, show_hidden: bool) -> Result<Vec<String>, String> {
+    let paths = files::text_files_in(std::path::Path::new(&folder), show_hidden)
+        .map_err(|e| e.to_string())?;
     Ok(paths
         .into_iter()
         .map(|p| p.to_string_lossy().to_string())
@@ -139,8 +151,9 @@ fn list_markdown_files(folder: String) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-fn list_subfolders(folder: String) -> Result<Vec<String>, String> {
-    let paths = files::subfolders_in(std::path::Path::new(&folder)).map_err(|e| e.to_string())?;
+fn list_subfolders(folder: String, show_hidden: bool) -> Result<Vec<String>, String> {
+    let paths = files::subfolders_in(std::path::Path::new(&folder), show_hidden)
+        .map_err(|e| e.to_string())?;
     Ok(paths
         .into_iter()
         .map(|p| p.to_string_lossy().to_string())
@@ -323,6 +336,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             list_markdown_files,
+            list_text_files,
             list_subfolders,
             read_file,
             resolve_md_link,

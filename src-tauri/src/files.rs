@@ -1,22 +1,31 @@
 use std::path::{Path, PathBuf};
 
-/// Return absolute paths of `.md`/`.markdown` files directly in `dir`, sorted by file name.
-pub fn markdown_files_in(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
+/// Whether `path`'s file name is a dotfile (hidden on Unix-like systems, and
+/// conventionally treated the same way in Explorer-style file browsers).
+fn is_hidden(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|n| n.to_str())
+        .map(|n| n.starts_with('.'))
+        .unwrap_or(false)
+}
+
+/// Shared directory scan for the file-listing functions below: files only,
+/// matching `exts`, optionally skipping dotfiles, sorted by name.
+fn files_with_extensions_in(
+    dir: &Path,
+    exts: &[&str],
+    show_hidden: bool,
+) -> std::io::Result<Vec<PathBuf>> {
     let mut out: Vec<PathBuf> = Vec::new();
     for entry in std::fs::read_dir(dir)? {
         let path = entry?.path();
         if !path.is_file() {
             continue;
         }
-        let is_md = path
-            .extension()
-            .and_then(|e| e.to_str())
-            .map(|e| {
-                let e = e.to_ascii_lowercase();
-                e == "md" || e == "markdown"
-            })
-            .unwrap_or(false);
-        if is_md {
+        if !show_hidden && is_hidden(&path) {
+            continue;
+        }
+        if has_extension(&path, exts) {
             out.push(path);
         }
     }
@@ -24,21 +33,29 @@ pub fn markdown_files_in(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
     Ok(out)
 }
 
+/// Return absolute paths of `.md`/`.markdown` files directly in `dir`, sorted
+/// by file name. Dotfiles are skipped unless `show_hidden` is set.
+pub fn markdown_files_in(dir: &Path, show_hidden: bool) -> std::io::Result<Vec<PathBuf>> {
+    files_with_extensions_in(dir, MD_EXTENSIONS, show_hidden)
+}
+
+/// Return absolute paths of all recognized text/code files directly in
+/// `dir` (a superset of `MD_EXTENSIONS`) — the listing used when "Markdown
+/// only" mode is off. Dotfiles are skipped unless `show_hidden` is set.
+pub fn text_files_in(dir: &Path, show_hidden: bool) -> std::io::Result<Vec<PathBuf>> {
+    files_with_extensions_in(dir, TEXT_EXTENSIONS, show_hidden)
+}
+
 /// Return absolute paths of immediate subdirectories of `dir`, sorted by
-/// name, skipping hidden (dot-prefixed) directories like `.git`.
-pub fn subfolders_in(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
+/// name. Dotfiles (e.g. `.git`) are skipped unless `show_hidden` is set.
+pub fn subfolders_in(dir: &Path, show_hidden: bool) -> std::io::Result<Vec<PathBuf>> {
     let mut out: Vec<PathBuf> = Vec::new();
     for entry in std::fs::read_dir(dir)? {
         let path = entry?.path();
         if !path.is_dir() {
             continue;
         }
-        let hidden = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .map(|n| n.starts_with('.'))
-            .unwrap_or(false);
-        if hidden {
+        if !show_hidden && is_hidden(&path) {
             continue;
         }
         out.push(path);
@@ -68,6 +85,21 @@ fn has_extension(path: &Path, exts: &[&str]) -> bool {
 }
 
 const MD_EXTENSIONS: &[&str] = &["md", "markdown"];
+
+/// Extensions treated as viewable/editable "text" files when Markdown-only
+/// mode is off. A deliberately broad but non-exhaustive allow-list of plain
+/// text, config, and source-code formats; includes `MD_EXTENSIONS` itself
+/// since turning Markdown-only off means "show every text file", markdown
+/// included.
+pub const TEXT_EXTENSIONS: &[&str] = &[
+    "md", "markdown", "txt", "text", "log", "csv", "tsv",
+    "json", "jsonc", "yaml", "yml", "toml", "xml", "ini", "cfg", "conf", "env",
+    "sh", "bash", "zsh", "ps1", "bat", "cmd",
+    "js", "mjs", "cjs", "jsx", "ts", "tsx", "mts", "cts",
+    "rs", "go", "py", "rb", "php", "java", "kt", "kts", "swift",
+    "c", "h", "cpp", "cc", "hpp", "hh", "cs", "lua", "sql", "r", "scala", "pl", "pm",
+    "css", "scss", "sass", "less", "html", "htm", "vue", "svelte", "graphql", "proto",
+];
 
 /// Image extensions supported for inline preview/export. Kept in sync with
 /// `image_mime` below — every extension here must have a mapped MIME type.
@@ -194,7 +226,7 @@ mod tests {
         fs::write(dir.path().join("ignore.txt"), "x").unwrap();
         fs::create_dir(dir.path().join("subdir")).unwrap();
 
-        let files = markdown_files_in(dir.path()).unwrap();
+        let files = markdown_files_in(dir.path(), false).unwrap();
         let names: Vec<String> = files
             .iter()
             .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
@@ -210,12 +242,53 @@ mod tests {
         fs::create_dir(dir.path().join(".git")).unwrap();
         fs::write(dir.path().join("note.md"), "x").unwrap();
 
-        let dirs = subfolders_in(dir.path()).unwrap();
+        let dirs = subfolders_in(dir.path(), false).unwrap();
         let names: Vec<String> = dirs
             .iter()
             .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
             .collect();
         assert_eq!(names, vec!["alpha", "Zeta"]);
+    }
+
+    #[test]
+    fn show_hidden_reveals_dotfiles_and_dotdirs() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::create_dir(dir.path().join(".git")).unwrap();
+        fs::write(dir.path().join(".env"), "x").unwrap();
+        fs::write(dir.path().join(".hidden.md"), "x").unwrap();
+        fs::write(dir.path().join("visible.md"), "x").unwrap();
+
+        let dirs = subfolders_in(dir.path(), true).unwrap();
+        assert_eq!(dirs.len(), 1);
+        assert_eq!(dirs[0].file_name().unwrap(), ".git");
+
+        let md = markdown_files_in(dir.path(), true).unwrap();
+        let names: Vec<String> = md
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+        assert_eq!(names, vec![".hidden.md", "visible.md"]);
+    }
+
+    #[test]
+    fn lists_broad_text_extensions_sorted() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("notes.md"), "x").unwrap();
+        fs::write(dir.path().join("main.rs"), "x").unwrap();
+        fs::write(dir.path().join("config.YAML"), "x").unwrap();
+        fs::write(dir.path().join("data.json"), "x").unwrap();
+        fs::write(dir.path().join("photo.png"), "x").unwrap();
+        fs::write(dir.path().join(".hidden.txt"), "x").unwrap();
+
+        let text = text_files_in(dir.path(), false).unwrap();
+        let names: Vec<String> = text
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+        assert_eq!(names, vec!["config.YAML", "data.json", "main.rs", "notes.md"]);
+
+        let with_hidden = text_files_in(dir.path(), true).unwrap();
+        assert_eq!(with_hidden.len(), 5);
     }
 
     #[test]

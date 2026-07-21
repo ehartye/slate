@@ -4,9 +4,11 @@
   import {
     currentFile, currentFolder, content, dirty,
     themes, activeThemeName, activeMode, activeMermaidMode,
-    sidebarCollapsed, statusMsg,
+    sidebarCollapsed, statusMsg, mdOnlyMode,
   } from '$lib/stores'
   import { baseName, openNewWindow } from '$lib/tauri'
+  import { setMdOnlyMode } from '$lib/viewOptions'
+  import { relistCurrentFolder } from '$lib/workspace'
   import { listThemes, applyThemeVariant, savedThemeChoice, type Theme } from '$lib/theme'
   import { renderMarkdown } from '$lib/markdown'
   import { buildStandaloneHtml, collectThemeFontCss, collectMermaidScript } from '$lib/export'
@@ -64,6 +66,11 @@
       statusMsg.set(`Could not open new window: ${e}`)
     }
   }
+
+  async function toggleMdOnly() {
+    setMdOnlyMode(!$mdOnlyMode)
+    await relistCurrentFolder()
+  }
 </script>
 
 <header class="toolbar">
@@ -94,12 +101,35 @@
 
   <span class="spacer"></span>
 
-  <button class="browser-btn" onclick={newWindow} title="Open a new Slate window (Ctrl/Cmd+N)">
-    New window
+  <button
+    class="browser-btn"
+    class:off={!$mdOnlyMode}
+    onclick={toggleMdOnly}
+    title={$mdOnlyMode
+      ? 'Showing markdown files only — click to browse any text file'
+      : 'Browsing all text files — click to show markdown files only'}
+    aria-label="Toggle markdown-only file browsing"
+    aria-pressed={$mdOnlyMode}
+  >
+    <span class="nf-icon">{'\u{f0354}'}</span>
   </button>
 
-  <button class="browser-btn" onclick={openInBrowser} title="Open the rendered document in your browser">
-    Open in browser <span class="arrow">↗</span>
+  <button
+    class="browser-btn"
+    onclick={newWindow}
+    title="Open a new Slate window (Ctrl/Cmd+N)"
+    aria-label="Open a new Slate window"
+  >
+    <span class="nf-icon">{'\ueb23'}</span>
+  </button>
+
+  <button
+    class="browser-btn"
+    onclick={openInBrowser}
+    title="Open the rendered document in your browser"
+    aria-label="Open in browser"
+  >
+    <span class="nf-icon">{'\uf08e'}</span>
   </button>
 
   <button

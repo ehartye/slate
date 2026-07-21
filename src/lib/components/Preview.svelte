@@ -1,11 +1,13 @@
 <script lang="ts">
   import {
     content, activeMermaidMode, previewZoom,
-    currentFile, currentFolder, files, dirty, statusMsg,
+    currentFile, currentFolder, dirty, statusMsg,
     findOpen, findQuery, findActiveIndex, findMatchCount,
   } from '$lib/stores'
   import { renderMarkdown } from '$lib/markdown'
-  import { resolveMdLink, readFile, listMarkdownFiles, dirName } from '$lib/tauri'
+  import { isMarkdownPath, renderNonMarkdownPreview } from '$lib/fileKind'
+  import { resolveMdLink, readFile, dirName } from '$lib/tauri'
+  import { listWorkspace } from '$lib/workspace'
   import { inlineLocalImages } from '$lib/images'
   import { highlightMatches, clearHighlights, setActiveMatch } from '$lib/documentSearch'
   import { openUrl } from '@tauri-apps/plugin-opener'
@@ -23,8 +25,11 @@
 
   $effect(() => {
     const src = $content
+    const file = $currentFile
     if (timer) clearTimeout(timer)
-    timer = setTimeout(() => { html = renderMarkdown(src) }, 120)
+    timer = setTimeout(() => {
+      html = isMarkdownPath(file) ? renderMarkdown(src) : renderNonMarkdownPreview(src, file ?? '')
+    }, 120)
   })
 
   // After HTML updates, render any mermaid blocks.
@@ -89,7 +94,7 @@
       if (dir && dir !== $currentFolder) {
         currentFolder.set(dir)
         try {
-          files.set(await listMarkdownFiles(dir))
+          await listWorkspace(dir)
         } catch (e) {
           statusMsg.set(`Could not list folder: ${e}`)
         }

@@ -4,12 +4,13 @@
   import {
     EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter,
   } from '@codemirror/view'
-  import { EditorState } from '@codemirror/state'
+  import { EditorState, Compartment } from '@codemirror/state'
   import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
   import { syntaxHighlighting, HighlightStyle } from '@codemirror/language'
   import { tags as t } from '@lezer/highlight'
   import { markdown } from '@codemirror/lang-markdown'
   import { content, currentFile, dirty, editorScroll, reloadTrigger } from '$lib/stores'
+  import { isMarkdownPath } from '$lib/fileKind'
 
   // Markdown source highlighting that follows the active theme via CSS variables.
   const mdHighlight = HighlightStyle.define([
@@ -32,6 +33,13 @@
   let lastLoaded: string | null = null
   let lastTrigger = 0
 
+  // Non-markdown files are viewable but locked for editing (MD-only mode off
+  // still lets you browse them; only .md/.markdown stays writable).
+  const readOnlyCompartment = new Compartment()
+  function readOnlyExtensions(readOnly: boolean) {
+    return [EditorState.readOnly.of(readOnly), EditorView.editable.of(!readOnly)]
+  }
+
   onMount(() => {
     view = new EditorView({
       parent: host,
@@ -46,6 +54,7 @@
           markdown(),
           syntaxHighlighting(mdHighlight),
           EditorView.lineWrapping,
+          readOnlyCompartment.of(readOnlyExtensions(!isMarkdownPath(get(currentFile)))),
           EditorView.updateListener.of((u) => {
             if (u.docChanged) {
               content.set(u.state.doc.toString())
@@ -68,15 +77,20 @@
     }
   })
 
-  // Swap the document when the open file changes OR an external reload is triggered.
+  // Swap the document (and re-lock/unlock editing) when the open file
+  // changes OR an external reload is triggered.
   $effect(() => {
     const file = $currentFile
     const trigger = $reloadTrigger
     if (!view || (file === lastLoaded && trigger === lastTrigger)) return
     lastLoaded = file
     lastTrigger = trigger
-    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: get(content) } })
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: get(content) },
+      effects: readOnlyCompartment.reconfigure(readOnlyExtensions(!isMarkdownPath(file))),
+    })
   })
+
 </script>
 
 <div class="cm-host" bind:this={host}></div>

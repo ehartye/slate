@@ -10,12 +10,14 @@
   import {
     content, currentFile, dirty, statusMsg, editorScroll,
     sidebarCollapsed, editorCollapsed, previewCollapsed, previewZoom, reloadTrigger,
-    sidebarWidth, findOpen,
+    sidebarWidth, findOpen, mdOnlyMode, showHiddenFiles,
   } from '$lib/stores'
   import { writeFile, readFile, openNewWindow } from '$lib/tauri'
   import { loadFile } from '$lib/workspace'
+  import { isMarkdownPath } from '$lib/fileKind'
   import { loadZoom, setZoom, nudgeZoom } from '$lib/zoom'
   import { loadSidebarWidth, clampSidebarWidth, persistSidebarWidth } from '$lib/sidebarWidth'
+  import { loadMdOnlyMode, loadShowHiddenFiles } from '$lib/viewOptions'
   import { clearImageCache } from '$lib/images'
   import '@fontsource/press-start-2p/400.css'
   import '@fontsource/vt323/400.css'
@@ -40,6 +42,8 @@
   // Restore the remembered preview zoom.
   previewZoom.set(loadZoom())
   sidebarWidth.set(loadSidebarWidth())
+  mdOnlyMode.set(loadMdOnlyMode())
+  showHiddenFiles.set(loadShowHiddenFiles())
 
   // Keep the file watcher in sync with whichever file is open.
   $effect(() => {
@@ -139,6 +143,10 @@
     const path = $currentFile
     if (!path) {
       statusMsg.set('Open a file before saving')
+      return
+    }
+    if (!isMarkdownPath(path)) {
+      statusMsg.set('Read-only — only markdown files can be edited')
       return
     }
     try {

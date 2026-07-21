@@ -1,10 +1,15 @@
 import { invoke } from '@tauri-apps/api/core'
 
-export const listMarkdownFiles = (folder: string) =>
-  invoke<string[]>('list_markdown_files', { folder })
+export const listMarkdownFiles = (folder: string, showHidden: boolean) =>
+  invoke<string[]>('list_markdown_files', { folder, showHidden })
 
-export const listSubfolders = (folder: string) =>
-  invoke<string[]>('list_subfolders', { folder })
+/** Every recognized text/code file (not just markdown) — used when "Markdown
+ *  only" mode is off. */
+export const listTextFiles = (folder: string, showHidden: boolean) =>
+  invoke<string[]>('list_text_files', { folder, showHidden })
+
+export const listSubfolders = (folder: string, showHidden: boolean) =>
+  invoke<string[]>('list_subfolders', { folder, showHidden })
 
 /** Open another independent Slate window (blank — no folder/file pre-selected). */
 export const openNewWindow = () => invoke<void>('open_new_window')

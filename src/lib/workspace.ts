@@ -1,15 +1,19 @@
 import { get } from 'svelte/store'
 import {
   content, currentFile, currentFolder, files, folders, dirty, statusMsg, reloadTrigger,
+  mdOnlyMode, showHiddenFiles,
 } from './stores'
-import { listMarkdownFiles, listSubfolders, readFile, dirName } from './tauri'
+import { listMarkdownFiles, listTextFiles, listSubfolders, readFile, dirName } from './tauri'
 
-/** Populate the `files`/`folders` stores for `dir`. Shared by every place
+/** Populate the `files`/`folders` stores for `dir`, honoring the current
+ *  "Markdown only" and "show hidden files" settings. Shared by every place
  *  that needs to (re)list a directory's contents for the sidebar. */
-async function listWorkspace(dir: string): Promise<void> {
+export async function listWorkspace(dir: string): Promise<void> {
+  const showHidden = get(showHiddenFiles)
+  const listFiles = get(mdOnlyMode) ? listMarkdownFiles : listTextFiles
   const [fileList, folderList] = await Promise.all([
-    listMarkdownFiles(dir),
-    listSubfolders(dir),
+    listFiles(dir, showHidden),
+    listSubfolders(dir, showHidden),
   ])
   files.set(fileList)
   folders.set(folderList)
@@ -40,6 +44,19 @@ export async function loadFile(path: string) {
  *  opening any file. Used for the folder-up button and clicking a subfolder. */
 export async function browseFolder(dir: string) {
   currentFolder.set(dir)
+  try {
+    await listWorkspace(dir)
+  } catch (e) {
+    statusMsg.set(`Could not list folder: ${e}`)
+  }
+}
+
+/** Re-list the currently browsed folder, if any — a no-op otherwise. Used
+ *  after toggling a file-browser filter (Markdown-only, show hidden files)
+ *  so the sidebar reflects the new setting immediately. */
+export async function relistCurrentFolder() {
+  const dir = get(currentFolder)
+  if (!dir) return
   try {
     await listWorkspace(dir)
   } catch (e) {

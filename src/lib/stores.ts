@@ -12,6 +12,10 @@ export const statusMsg = writable<string>('')         // transient errors/info
 export const editorScroll = writable<number>(0)       // 0..1 scroll fraction, for preview sync
 export const previewZoom = writable<number>(1)        // preview render scale, persisted
 
+// File-browser filters, persisted
+export const mdOnlyMode = writable<boolean>(true)      // false: browse any text file, not just .md
+export const showHiddenFiles = writable<boolean>(false) // true: include dotfiles/dot-dirs
+
 // Layout collapse state
 export const sidebarCollapsed = writable<boolean>(false)
 export const sidebarWidth = writable<number>(220)     // file browser panel width, persisted
