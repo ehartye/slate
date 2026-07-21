@@ -2,18 +2,20 @@
   import Toolbar from '$lib/components/Toolbar.svelte'
   import Sidebar from '$lib/components/Sidebar.svelte'
   import StatusBar from '$lib/components/StatusBar.svelte'
+  import TabBar from '$lib/components/TabBar.svelte'
   import Editor from '$lib/components/Editor.svelte'
   import Preview from '$lib/components/Preview.svelte'
   import { onMount } from 'svelte'
   import { invoke } from '@tauri-apps/api/core'
   import { listen } from '@tauri-apps/api/event'
   import {
-    content, currentFile, dirty, statusMsg, editorScroll,
+    content, currentFile, dirty, statusMsg, editorScroll, tabs, activeTabId,
     sidebarCollapsed, editorCollapsed, previewCollapsed, previewZoom, reloadTrigger,
     sidebarWidth, findOpen, mdOnlyMode, showHiddenFiles,
   } from '$lib/stores'
-  import { writeFile, readFile, openNewWindow } from '$lib/tauri'
+  import { writeFile, readFile, openNewWindow, baseName } from '$lib/tauri'
   import { loadFile } from '$lib/workspace'
+  import { closeTab, cycleTab, markBackgroundTabForReload } from '$lib/tabs'
   import { isMarkdownPath } from '$lib/fileKind'
   import { loadZoom, setZoom, nudgeZoom } from '$lib/zoom'
   import { loadSidebarWidth, clampSidebarWidth, persistSidebarWidth } from '$lib/sidebarWidth'
@@ -37,7 +39,9 @@
 
   let previewPane = $state<HTMLElement>()
   let editorFlex = $state(1)
-  let suppressNextChange = false
+  // Paths whose *next* file-changed event should be ignored (our own save,
+  // not an external edit) — per-path since several tabs can be open at once.
+  let suppressNextChangeFor = new Set<string>()
 
   // Restore the remembered preview zoom.
   previewZoom.set(loadZoom())
@@ -45,11 +49,18 @@
   mdOnlyMode.set(loadMdOnlyMode())
   showHiddenFiles.set(loadShowHiddenFiles())
 
-  // Keep the file watcher in sync with whichever file is open.
+  // Keep the file watchers in sync with whichever tabs are open — one
+  // watch_file per open tab, not just the active one.
+  let watchedPaths = new Set<string>()
   $effect(() => {
-    const path = $currentFile
-    if (path) invoke('watch_file', { path }).catch(() => {})
-    else invoke('unwatch_file').catch(() => {})
+    const paths = new Set($tabs.map((t) => t.path))
+    for (const p of paths) {
+      if (!watchedPaths.has(p)) invoke('watch_file', { path: p }).catch(() => {})
+    }
+    for (const p of watchedPaths) {
+      if (!paths.has(p)) invoke('unwatch_file', { path: p }).catch(() => {})
+    }
+    watchedPaths = paths
   })
 
   // Load a file passed on launch (Windows: CLI arg, macOS: Apple Events), or one
@@ -73,13 +84,23 @@
     const unlisten = await listen<string>('open-file', (event) => loadFile(event.payload))
 
     const unlistenChanged = await listen<string>('file-changed', async (event) => {
-      if (suppressNextChange) { suppressNextChange = false; return }
+      const path = event.payload
+      if (suppressNextChangeFor.delete(path)) return
+
+      if (path !== $currentFile) {
+        // A background tab's file changed — mark it, reload lazily when
+        // the user actually switches to it (tabs.ts's switchToTab).
+        if (markBackgroundTabForReload(path)) {
+          statusMsg.set(`"${baseName(path)}" changed on disk`)
+        }
+        return
+      }
       if ($dirty) {
         statusMsg.set('File changed on disk — save or discard changes to reload')
         return
       }
       try {
-        content.set(await readFile(event.payload))
+        content.set(await readFile(path))
         clearImageCache()
         reloadTrigger.update(n => n + 1)
         statusMsg.set('Reloaded from disk')
@@ -150,12 +171,12 @@
       return
     }
     try {
-      suppressNextChange = true
+      suppressNextChangeFor.add(path)
       await writeFile(path, $content)
       dirty.set(false)
       statusMsg.set('')
     } catch (e) {
-      suppressNextChange = false
+      suppressNextChangeFor.delete(path)
       statusMsg.set(`Save failed: ${e}`)
     }
   }
@@ -168,6 +189,12 @@
     } else if (e.key.toLowerCase() === 'n') {
       e.preventDefault()
       openNewWindow().catch((err) => statusMsg.set(`Could not open new window: ${err}`))
+    } else if (e.key.toLowerCase() === 'w') {
+      e.preventDefault()
+      if ($activeTabId) closeTab($activeTabId)
+    } else if (e.key === 'Tab' && $tabs.length > 1) {
+      e.preventDefault()
+      cycleTab(e.shiftKey ? -1 : 1)
     } else if (e.key === '=' || e.key === '+') {
       e.preventDefault()
       nudgeZoom(1)
@@ -195,7 +222,9 @@
       <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
       <div class="sidebar-divider" onmousedown={startSidebarDrag} role="separator" aria-orientation="vertical" aria-label="Resize file browser"></div>
     {/if}
-    <div class="split">
+    <div class="content-area">
+      <TabBar />
+      <div class="split">
       {#if $editorCollapsed}
         <button class="rail" onclick={() => editorCollapsed.set(false)} title="Expand editor">
           <span class="rail-icon">›</span><span class="rail-label">Editor</span>
@@ -234,6 +263,7 @@
           <div class="pane-content preview-scroll" bind:this={previewPane}><Preview /></div>
         </section>
       {/if}
+      </div>
     </div>
   </div>
   <StatusBar />

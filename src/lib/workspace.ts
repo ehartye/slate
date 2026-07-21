@@ -4,6 +4,7 @@ import {
   mdOnlyMode, showHiddenFiles,
 } from './stores'
 import { listMarkdownFiles, listTextFiles, listSubfolders, readFile, dirName } from './tauri'
+import { openTab } from './tabs'
 
 /** Populate the `files`/`folders` stores for `dir`, honoring the current
  *  "Markdown only" and "show hidden files" settings. Shared by every place
@@ -19,8 +20,9 @@ export async function listWorkspace(dir: string): Promise<void> {
   folders.set(folderList)
 }
 
-/** Open `path`, loading its parent folder into the sidebar. Used for files
- *  opened via OS association, the "Open file…" dialog, and relative links. */
+/** Open `path` as a tab, loading its parent folder into the sidebar. Used
+ *  for files opened via OS association, the "Open file…" dialog, and
+ *  relative links — switches to an already-open tab instead of duplicating it. */
 export async function loadFile(path: string) {
   const dir = dirName(path)
   if (dir) {
@@ -31,13 +33,7 @@ export async function loadFile(path: string) {
       statusMsg.set(`Could not list folder: ${e}`)
     }
   }
-  try {
-    content.set(await readFile(path))
-    currentFile.set(path)
-    dirty.set(false)
-  } catch (e) {
-    statusMsg.set(`Could not open file: ${e}`)
-  }
+  await openTab(path)
 }
 
 /** Navigate the sidebar into `dir` — re-list its files/subfolders — without

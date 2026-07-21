@@ -1,6 +1,7 @@
 mod files;
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
@@ -12,9 +13,19 @@ use tauri::{Emitter, Manager};
 use tauri_plugin_opener::OpenerExt;
 
 struct OpenedFile(Mutex<Option<String>>);
-/// One file watcher per window, keyed by window label, so multiple Slate
-/// windows can each watch their own open file independently.
-struct FileWatchers(Mutex<HashMap<String, Debouncer<RecommendedWatcher>>>);
+
+/// File-watch state shared across the whole app. A single window can have
+/// several tabs open (each watching its own file), and the same file can be
+/// open in tabs across multiple windows — so watchers are refcounted per
+/// path (one real fs watch per unique file, however many tabs care about it),
+/// with a per-window path list kept alongside purely so a closed window's
+/// watches can be unwound correctly (see `on_window_event` in `run()`).
+struct FileWatchState {
+    watchers: HashMap<PathBuf, (Debouncer<RecommendedWatcher>, u32)>,
+    by_window: HashMap<String, Vec<PathBuf>>,
+}
+struct FileWatchers(Mutex<FileWatchState>);
+
 /// Whether the first macOS `RunEvent::Opened` (the file that launched the
 /// process, if any) has already been handled. Later opens, while the app is
 /// already running, spawn a new window instead of hijacking an existing one.
@@ -213,6 +224,23 @@ fn get_startup_file(state: tauri::State<OpenedFile>) -> Option<String> {
     })
 }
 
+/// Decrement `path`'s refcount, removing (and thus dropping/stopping) its
+/// watcher once nothing references it anymore.
+fn decrement_watch(
+    watchers: &mut HashMap<PathBuf, (Debouncer<RecommendedWatcher>, u32)>,
+    path: &PathBuf,
+) {
+    let hit_zero = if let Some((_, count)) = watchers.get_mut(path) {
+        *count = count.saturating_sub(1);
+        *count == 0
+    } else {
+        false
+    };
+    if hit_zero {
+        watchers.remove(path);
+    }
+}
+
 #[tauri::command]
 fn watch_file(
     app: tauri::AppHandle,
@@ -220,28 +248,38 @@ fn watch_file(
     state: tauri::State<FileWatchers>,
     path: String,
 ) -> Result<(), String> {
-    let file_path = std::path::PathBuf::from(&path);
+    let file_path = PathBuf::from(&path);
     let parent = file_path
         .parent()
         .ok_or_else(|| "file has no parent directory".to_string())?
         .to_path_buf();
 
     let label = window.label().to_string();
+    let mut st = state.0.lock().map_err(|e| e.to_string())?;
+
+    // Track this path under the window regardless of whether it's the first
+    // tab (anywhere) to watch it, so window-close cleanup unwinds correctly.
+    st.by_window.entry(label).or_default().push(file_path.clone());
+
+    if let Some((_, count)) = st.watchers.get_mut(&file_path) {
+        *count += 1;
+        return Ok(());
+    }
+
     let app_h = app.clone();
     let watched = path.clone();
-    let emit_label = label.clone();
+    let watch_target = file_path.clone();
 
     // Watch the parent dir so atomic-rename saves (vim, VSCode, etc.) are caught.
     let mut debouncer = new_debouncer(
         Duration::from_millis(300),
         move |res: DebounceEventResult| {
             if let Ok(events) = res {
-                let matches = events.iter().any(|e| e.path == file_path);
+                let matches = events.iter().any(|e| e.path == watch_target);
                 if matches {
-                    // Target only the window that owns this watcher — with
-                    // multiple windows open, a broadcast would misfire in
-                    // every other window watching a different file.
-                    let _ = app_h.emit_to(emit_label.as_str(), "file-changed", watched.clone());
+                    // Broadcast: the same file can be open in tabs across
+                    // several windows, each of which matches by path itself.
+                    let _ = app_h.emit("file-changed", watched.clone());
                 }
             }
         },
@@ -253,15 +291,26 @@ fn watch_file(
         .watch(&parent, RecursiveMode::NonRecursive)
         .map_err(|e| e.to_string())?;
 
-    let mut guard = state.0.lock().map_err(|e| e.to_string())?;
-    guard.insert(label, debouncer);
+    st.watchers.insert(file_path, (debouncer, 1));
     Ok(())
 }
 
 #[tauri::command]
-fn unwatch_file(window: tauri::Window, state: tauri::State<FileWatchers>) -> Result<(), String> {
-    let mut guard = state.0.lock().map_err(|e| e.to_string())?;
-    guard.remove(window.label());
+fn unwatch_file(
+    window: tauri::Window,
+    state: tauri::State<FileWatchers>,
+    path: String,
+) -> Result<(), String> {
+    let file_path = PathBuf::from(&path);
+    let label = window.label().to_string();
+    let mut st = state.0.lock().map_err(|e| e.to_string())?;
+
+    if let Some(paths) = st.by_window.get_mut(&label) {
+        if let Some(pos) = paths.iter().position(|p| p == &file_path) {
+            paths.remove(pos);
+        }
+    }
+    decrement_watch(&mut st.watchers, &file_path);
     Ok(())
 }
 
@@ -328,7 +377,10 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(OpenedFile(Mutex::new(None)))
-        .manage(FileWatchers(Mutex::new(HashMap::new())))
+        .manage(FileWatchers(Mutex::new(FileWatchState {
+            watchers: HashMap::new(),
+            by_window: HashMap::new(),
+        })))
         .manage(FirstOpenHandled(Mutex::new(false)))
         .setup(|app| {
             seed_themes(&app.handle()).map_err(|e| e.to_string())?;
@@ -350,13 +402,18 @@ pub fn run() {
             open_new_window,
             set_window_icon
         ])
-        // Stop watching a window's file once it closes, so `FileWatchers`
-        // doesn't accumulate stale entries as windows come and go.
+        // Stop watching a window's tabs' files once it closes, so
+        // `FileWatchers` doesn't accumulate stale entries as windows come
+        // and go (each path's refcount is unwound, not just cleared).
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
                 if let Some(state) = window.try_state::<FileWatchers>() {
-                    if let Ok(mut guard) = state.0.lock() {
-                        guard.remove(window.label());
+                    if let Ok(mut st) = state.0.lock() {
+                        if let Some(paths) = st.by_window.remove(window.label()) {
+                            for p in paths {
+                                decrement_watch(&mut st.watchers, &p);
+                            }
+                        }
                     }
                 }
             }

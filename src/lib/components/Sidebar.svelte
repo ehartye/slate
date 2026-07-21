@@ -2,11 +2,12 @@
   import { open } from '@tauri-apps/plugin-dialog'
   import { revealItemInDir } from '@tauri-apps/plugin-opener'
   import {
-    currentFolder, files, folders, currentFile, content, dirty, statusMsg, sidebarWidth,
+    currentFolder, files, folders, currentFile, statusMsg, sidebarWidth,
     showHiddenFiles, mdOnlyMode,
   } from '$lib/stores'
-  import { readFile, baseName, dirName } from '$lib/tauri'
+  import { baseName, dirName } from '$lib/tauri'
   import { loadFile, refreshWorkspace, browseFolder, folderUp, relistCurrentFolder } from '$lib/workspace'
+  import { openTab } from '$lib/tabs'
   import { setShowHiddenFiles } from '$lib/viewOptions'
 
   // The up button is enabled only when the current folder actually has a
@@ -29,17 +30,6 @@
     })
     if (typeof picked !== 'string') return
     await loadFile(picked)
-  }
-
-  async function openFile(path: string) {
-    try {
-      const text = await readFile(path)
-      content.set(text)
-      currentFile.set(path)
-      dirty.set(false)
-    } catch (e) {
-      statusMsg.set(`Could not open file: ${e}`)
-    }
   }
 
   async function toggleHiddenFiles() {
@@ -109,7 +99,7 @@
       <li>
         <button
           class:active={$currentFile === path}
-          onclick={() => openFile(path)}
+          onclick={() => openTab(path)}
           oncontextmenu={(e) => showContextMenu(e, path)}
         >
           {baseName(path)}

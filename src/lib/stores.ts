@@ -4,6 +4,20 @@ import type { Theme } from './theme'
 export const currentFolder = writable<string | null>(null)
 export const files = writable<string[]>([])          // full paths
 export const folders = writable<string[]>([])         // subfolders of currentFolder, full paths
+
+/** One open tab. `content`/`dirty`/`editorScroll` (below) always mirror
+ *  whichever tab is active — see tabs.ts for the open/switch/close logic
+ *  that keeps a tab's own snapshot in sync as it's switched away from. */
+export interface Tab {
+  id: string
+  path: string
+  dirty: boolean
+  scrollFraction: number   // last editor scroll fraction, restored on reactivation
+  needsReload: boolean     // an external file-changed event arrived while this tab was inactive
+}
+export const tabs = writable<Tab[]>([])
+export const activeTabId = writable<string | null>(null)
+
 export const currentFile = writable<string | null>(null)
 export const content = writable<string>('')           // editor text
 export const dirty = writable<boolean>(false)
@@ -34,3 +48,4 @@ export const findOpen = writable<boolean>(false)
 export const findQuery = writable<string>('')
 export const findActiveIndex = writable<number>(0)
 export const findMatchCount = writable<number>(0)
+

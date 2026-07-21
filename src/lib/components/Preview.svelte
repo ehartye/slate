@@ -1,13 +1,14 @@
 <script lang="ts">
   import {
     content, activeMermaidMode, previewZoom,
-    currentFile, currentFolder, dirty, statusMsg,
+    currentFile, currentFolder, statusMsg,
     findOpen, findQuery, findActiveIndex, findMatchCount,
   } from '$lib/stores'
   import { renderMarkdown } from '$lib/markdown'
   import { isMarkdownPath, renderNonMarkdownPreview } from '$lib/fileKind'
-  import { resolveMdLink, readFile, dirName } from '$lib/tauri'
+  import { resolveMdLink, dirName } from '$lib/tauri'
   import { listWorkspace } from '$lib/workspace'
+  import { openTab } from '$lib/tabs'
   import { inlineLocalImages } from '$lib/images'
   import { highlightMatches, clearHighlights, setActiveMatch } from '$lib/documentSearch'
   import { openUrl } from '@tauri-apps/plugin-opener'
@@ -83,25 +84,19 @@
     findQuery.set('')
   })
 
-  // Load a document into the app (shared shape with the sidebar's open).
+  // Load a document into the app (shared shape with the sidebar's open) —
+  // opens it as a tab, switching to an already-open one instead of duplicating.
   async function openDoc(path: string) {
-    try {
-      const text = await readFile(path)
-      content.set(text)
-      currentFile.set(path)
-      dirty.set(false)
-      const dir = dirName(path)
-      if (dir && dir !== $currentFolder) {
-        currentFolder.set(dir)
-        try {
-          await listWorkspace(dir)
-        } catch (e) {
-          statusMsg.set(`Could not list folder: ${e}`)
-        }
+    const dir = dirName(path)
+    if (dir && dir !== $currentFolder) {
+      currentFolder.set(dir)
+      try {
+        await listWorkspace(dir)
+      } catch (e) {
+        statusMsg.set(`Could not list folder: ${e}`)
       }
-    } catch (e) {
-      statusMsg.set(`Could not open file: ${e}`)
     }
+    await openTab(path)
   }
 
   // Intercept link clicks in the rendered preview. Attached via addEventListener

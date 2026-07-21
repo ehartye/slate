@@ -13,7 +13,7 @@ import { loadFile, refreshWorkspace, browseFolder, folderUp, relistCurrentFolder
 import { listMarkdownFiles, listTextFiles, listSubfolders, readFile } from '../src/lib/tauri'
 import {
   content, currentFile, currentFolder, files, folders, dirty, statusMsg, reloadTrigger,
-  mdOnlyMode, showHiddenFiles,
+  mdOnlyMode, showHiddenFiles, tabs, activeTabId,
 } from '../src/lib/stores'
 
 const mockList = vi.mocked(listMarkdownFiles)
@@ -35,10 +35,12 @@ beforeEach(() => {
   reloadTrigger.set(0)
   mdOnlyMode.set(true)
   showHiddenFiles.set(false)
+  tabs.set([])
+  activeTabId.set(null)
 })
 
 describe('loadFile', () => {
-  it('loads the parent folder and opens the file', async () => {
+  it('loads the parent folder and opens the file as a new tab', async () => {
     mockList.mockResolvedValue(['C:\\docs\\a.md', 'C:\\docs\\b.md'])
     mockSubfolders.mockResolvedValue(['C:\\docs\\sub'])
     mockRead.mockResolvedValue('# hello')
@@ -51,6 +53,8 @@ describe('loadFile', () => {
     expect(get(content)).toBe('# hello')
     expect(get(currentFile)).toBe('C:\\docs\\b.md')
     expect(get(dirty)).toBe(false)
+    expect(get(tabs).map((t) => t.path)).toEqual(['C:\\docs\\b.md'])
+    expect(get(activeTabId)).toBe(get(tabs)[0].id)
   })
 
   it('surfaces a read failure via statusMsg', async () => {
