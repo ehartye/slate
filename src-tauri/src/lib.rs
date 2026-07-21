@@ -1,5 +1,7 @@
 mod files;
 
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
 use notify_debouncer_mini::{
@@ -10,7 +12,17 @@ use tauri::{Emitter, Manager};
 use tauri_plugin_opener::OpenerExt;
 
 struct OpenedFile(Mutex<Option<String>>);
-struct FileWatcher(Mutex<Option<Debouncer<RecommendedWatcher>>>);
+/// One file watcher per window, keyed by window label, so multiple Slate
+/// windows can each watch their own open file independently.
+struct FileWatchers(Mutex<HashMap<String, Debouncer<RecommendedWatcher>>>);
+/// Whether the first macOS `RunEvent::Opened` (the file that launched the
+/// process, if any) has already been handled. Later opens, while the app is
+/// already running, spawn a new window instead of hijacking an existing one.
+struct FirstOpenHandled(Mutex<bool>);
+
+/// Labels new windows uniquely for the lifetime of the process ("main" is
+/// reserved for the initial window declared in `tauri.conf.json`).
+static WINDOW_COUNTER: AtomicU32 = AtomicU32::new(1);
 
 const STARTER_THEMES: &[(&str, &str)] = &[
     ("aurora-dark.css", include_str!("../themes/aurora-dark.css")),
@@ -165,12 +177,13 @@ fn resolve_image_data_url(base: String, href: String) -> Result<Option<String>, 
 }
 
 /// The markdown file passed on launch — via Apple Events on macOS or CLI args on Windows.
+/// Consumes the stored macOS value so it's only ever delivered to one window.
 #[tauri::command]
 fn get_startup_file(state: tauri::State<OpenedFile>) -> Option<String> {
     // macOS: file delivered via Apple Events, stored in managed state
-    if let Ok(guard) = state.0.lock() {
+    if let Ok(mut guard) = state.0.lock() {
         if guard.is_some() {
-            return guard.clone();
+            return guard.take();
         }
     }
     // Windows: file delivered as a CLI argument
@@ -190,7 +203,8 @@ fn get_startup_file(state: tauri::State<OpenedFile>) -> Option<String> {
 #[tauri::command]
 fn watch_file(
     app: tauri::AppHandle,
-    state: tauri::State<FileWatcher>,
+    window: tauri::Window,
+    state: tauri::State<FileWatchers>,
     path: String,
 ) -> Result<(), String> {
     let file_path = std::path::PathBuf::from(&path);
@@ -199,8 +213,10 @@ fn watch_file(
         .ok_or_else(|| "file has no parent directory".to_string())?
         .to_path_buf();
 
+    let label = window.label().to_string();
     let app_h = app.clone();
     let watched = path.clone();
+    let emit_label = label.clone();
 
     // Watch the parent dir so atomic-rename saves (vim, VSCode, etc.) are caught.
     let mut debouncer = new_debouncer(
@@ -209,7 +225,10 @@ fn watch_file(
             if let Ok(events) = res {
                 let matches = events.iter().any(|e| e.path == file_path);
                 if matches {
-                    let _ = app_h.emit("file-changed", watched.clone());
+                    // Target only the window that owns this watcher — with
+                    // multiple windows open, a broadcast would misfire in
+                    // every other window watching a different file.
+                    let _ = app_h.emit_to(emit_label.as_str(), "file-changed", watched.clone());
                 }
             }
         },
@@ -222,14 +241,14 @@ fn watch_file(
         .map_err(|e| e.to_string())?;
 
     let mut guard = state.0.lock().map_err(|e| e.to_string())?;
-    *guard = Some(debouncer);
+    guard.insert(label, debouncer);
     Ok(())
 }
 
 #[tauri::command]
-fn unwatch_file(state: tauri::State<FileWatcher>) -> Result<(), String> {
+fn unwatch_file(window: tauri::Window, state: tauri::State<FileWatchers>) -> Result<(), String> {
     let mut guard = state.0.lock().map_err(|e| e.to_string())?;
-    *guard = None;
+    guard.remove(window.label());
     Ok(())
 }
 
@@ -260,13 +279,44 @@ fn open_in_browser(app: tauri::AppHandle, html: String) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+/// Create another Slate window, cloned from the `main` window's config
+/// (size/title/etc.) with a fresh label, so multiple independent instances
+/// can be open at once. `open_path`, if given, loads that file on mount.
+fn spawn_window(app: &tauri::AppHandle, open_path: Option<&str>) -> Result<(), String> {
+    let n = WINDOW_COUNTER.fetch_add(1, Ordering::SeqCst);
+    let label = format!("slate-{n}");
+    let mut conf = app
+        .config()
+        .app
+        .windows
+        .iter()
+        .find(|w| w.label == "main")
+        .cloned()
+        .ok_or_else(|| "no main window config to clone".to_string())?;
+    conf.label = label;
+    conf.url = tauri::WebviewUrl::App(files::new_window_url_path(open_path).into());
+
+    tauri::WebviewWindowBuilder::from_config(app, &conf)
+        .map_err(|e| e.to_string())?
+        .build()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Open a new, independent Slate window (blank — no folder/file pre-selected).
+#[tauri::command]
+async fn open_new_window(app: tauri::AppHandle) -> Result<(), String> {
+    spawn_window(&app, None)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(OpenedFile(Mutex::new(None)))
-        .manage(FileWatcher(Mutex::new(None)))
+        .manage(FileWatchers(Mutex::new(HashMap::new())))
+        .manage(FirstOpenHandled(Mutex::new(false)))
         .setup(|app| {
             seed_themes(&app.handle()).map_err(|e| e.to_string())?;
             Ok(())
@@ -283,14 +333,28 @@ pub fn run() {
             get_startup_file,
             list_themes,
             open_in_browser,
+            open_new_window,
             set_window_icon
         ])
+        // Stop watching a window's file once it closes, so `FileWatchers`
+        // doesn't accumulate stale entries as windows come and go.
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::Destroyed = event {
+                if let Some(state) = window.try_state::<FileWatchers>() {
+                    if let Ok(mut guard) = state.0.lock() {
+                        guard.remove(window.label());
+                    }
+                }
+            }
+        })
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
         .run(|app, event| {
             // macOS delivers file-association opens via Apple Events, not CLI args.
-            // Store the path in managed state (for get_startup_file on cold launch)
-            // and emit an event (for hot launch when the app is already running).
+            // The first one (if any) is the file that launched the process, so it's
+            // routed into the pre-existing `main` window the same way as before.
+            // Any later one means the app was already running — that gets its own
+            // new window instead of hijacking whatever's already open.
             #[cfg(any(target_os = "macos", target_os = "ios"))]
             if let tauri::RunEvent::Opened { urls } = &event {
                 let path = urls.iter().find_map(|url| {
@@ -308,12 +372,20 @@ pub fn run() {
                     })
                 });
                 if let Some(ref path_str) = path {
-                    if let Some(state) = app.try_state::<OpenedFile>() {
-                        if let Ok(mut guard) = state.0.lock() {
-                            *guard = Some(path_str.clone());
+                    if let Ok(mut first) = app.state::<FirstOpenHandled>().0.lock() {
+                        if !*first {
+                            *first = true;
+                            if let Some(state) = app.try_state::<OpenedFile>() {
+                                if let Ok(mut guard) = state.0.lock() {
+                                    *guard = Some(path_str.clone());
+                                }
+                            }
+                            let _ = app.emit_to("main", "open-file", path_str.clone());
+                        } else {
+                            drop(first);
+                            let _ = spawn_window(app, Some(path_str));
                         }
                     }
-                    let _ = app.emit("open-file", path_str.clone());
                 }
             }
         });

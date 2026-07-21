@@ -12,7 +12,7 @@
     sidebarCollapsed, editorCollapsed, previewCollapsed, previewZoom, reloadTrigger,
     sidebarWidth, findOpen,
   } from '$lib/stores'
-  import { writeFile, readFile } from '$lib/tauri'
+  import { writeFile, readFile, openNewWindow } from '$lib/tauri'
   import { loadFile } from '$lib/workspace'
   import { loadZoom, setZoom, nudgeZoom } from '$lib/zoom'
   import { loadSidebarWidth, clampSidebarWidth, persistSidebarWidth } from '$lib/sidebarWidth'
@@ -48,14 +48,21 @@
     else invoke('unwatch_file').catch(() => {})
   })
 
-  // Load a file passed on launch (Windows: CLI arg, macOS: Apple Events).
+  // Load a file passed on launch (Windows: CLI arg, macOS: Apple Events), or one
+  // passed via `?open=` when this window was spawned to open a specific file
+  // (macOS hot file-open, or a future "open in new window" action).
   // Also listen for files opened while the app is already running (macOS Finder).
   onMount(async () => {
+    const openParam = new URLSearchParams(window.location.search).get('open')
     let startup: string | null = null
-    try {
-      startup = await invoke<string | null>('get_startup_file')
-    } catch {
-      return // not in a Tauri context
+    if (openParam) {
+      startup = openParam
+    } else {
+      try {
+        startup = await invoke<string | null>('get_startup_file')
+      } catch {
+        return // not in a Tauri context
+      }
     }
     if (startup) await loadFile(startup)
 
@@ -150,6 +157,9 @@
     if (e.key.toLowerCase() === 's') {
       e.preventDefault()
       save()
+    } else if (e.key.toLowerCase() === 'n') {
+      e.preventDefault()
+      openNewWindow().catch((err) => statusMsg.set(`Could not open new window: ${err}`))
     } else if (e.key === '=' || e.key === '+') {
       e.preventDefault()
       nudgeZoom(1)

@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window",
-  "windows": ["main"],
+  "description": "Capability for the main window and additional Slate windows",
+  "windows": ["main", "slate-*"],
   "permissions": [
     "core:default",
     "opener:default",

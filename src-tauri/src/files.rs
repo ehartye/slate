@@ -109,6 +109,21 @@ pub fn image_mime(path: &Path) -> &'static str {
     }
 }
 
+/// Build the frontend URL path for a new Slate window: plain `index.html` for
+/// a blank window, or `index.html?open=<encoded path>` to have it load a
+/// specific file on mount (used for "New Window" and macOS hot file-open).
+/// Encoding matches `application/x-www-form-urlencoded`, which the frontend
+/// decodes symmetrically via `URLSearchParams`.
+pub fn new_window_url_path(open_path: Option<&str>) -> String {
+    match open_path {
+        Some(path) => {
+            let encoded: String = url::form_urlencoded::byte_serialize(path.as_bytes()).collect();
+            format!("index.html?open={encoded}")
+        }
+        None => "index.html".to_string(),
+    }
+}
+
 /// Drop Windows' `\\?\` extended-length / verbatim prefix so the result matches
 /// the plain `C:\...` paths used elsewhere in the app. No-op on other platforms
 /// and for paths without the prefix.
@@ -293,5 +308,16 @@ mod tests {
         assert_eq!(parse_theme_name(":root{}"), "Untitled");
         assert_eq!(parse_mode(":root{}"), "light");
         assert_eq!(parse_css_var(":root{}", "--accent"), "");
+    }
+
+    #[test]
+    fn new_window_url_blank_without_path() {
+        assert_eq!(new_window_url_path(None), "index.html");
+    }
+
+    #[test]
+    fn new_window_url_encodes_path() {
+        let got = new_window_url_path(Some("/Users/me/My Notes/a b.md"));
+        assert_eq!(got, "index.html?open=%2FUsers%2Fme%2FMy+Notes%2Fa+b.md");
     }
 }
