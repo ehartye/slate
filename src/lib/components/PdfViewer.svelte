@@ -1,21 +1,33 @@
 <script lang="ts">
   import { onMount, onDestroy, tick } from 'svelte'
-  import { pdfDataUrl } from '$lib/stores'
+  import { openUrl } from '@tauri-apps/plugin-opener'
+  import { pdfDataUrl, statusMsg } from '$lib/stores'
   import {
     fitWidthScale,
     fitPageScale,
     clampZoom,
     currentPageFromVisibility,
   } from '$lib/pdfLayout'
-  import type { PDFDocumentProxy, PDFDocumentLoadingTask } from 'pdfjs-dist'
+  import { annotationRectToPercent, resolveDestinationPage, type LinkRect } from '$lib/pdfLinks'
+  import PdfOutline, { type OutlineNode } from './PdfOutline.svelte'
+  import { AnnotationType } from 'pdfjs-dist'
+  import type { PDFDocumentProxy, PDFDocumentLoadingTask, PDFPageProxy } from 'pdfjs-dist'
 
   type FitMode = 'width' | 'page' | 'custom'
+  // A clickable overlay for one link annotation on a page — either jumps to
+  // another page in this same document (targetPage) or opens an external
+  // URL (url); never both. `rect` is already page-relative percentages
+  // (see pdfLinks.ts), so it stays correctly positioned at any zoom level
+  // with no recomputation needed.
+  type PdfLinkOverlay = { id: string; rect: LinkRect; url?: string; targetPage?: number }
   type PageEntry = {
     num: number
     width: number // at scale 1, in PDF points
     height: number // at scale 1, in PDF points
     rendered: boolean
     renderGen: number // per-page staleness guard — see renderPage
+    links: PdfLinkOverlay[]
+    linksLoaded: boolean // fetched once per page, independent of zoom/re-render
   }
 
   // Horizontal padding .pdf-page-area applies in base.css — kept in sync
@@ -31,6 +43,11 @@
   let currentPageNum = $state(1)
   let loading = $state(false)
   let errorMsg = $state('')
+  // Table of contents / bookmarks (pdf.js calls this the "outline"). Empty
+  // for the (common) case of a PDF with no outline at all — the toolbar
+  // button only shows once this is non-empty.
+  let outline = $state<OutlineNode[]>([])
+  let showOutline = $state(false)
 
   let pdfjsLib: typeof import('pdfjs-dist') | null = null
   // $state.raw, not $state: we only ever reassign this wholesale (never
@@ -105,6 +122,85 @@
     canvas.width = viewport.width
     canvas.height = viewport.height
     await page.render({ canvas, viewport }).promise
+    // Link annotations don't depend on zoom (their overlay position is
+    // stored as page-relative percentages — see pdfLinks.ts), so this only
+    // needs to run once per page, not on every re-render.
+    if (!entry.linksLoaded) {
+      entry.linksLoaded = true
+      void loadLinksForPage(entry, doc, docToken, page)
+    }
+  }
+
+  /** Fetch a page's link annotations once and turn them into clickable,
+   *  percentage-positioned overlays. Runs alongside (not blocking) the
+   *  canvas render, using the same page object so this doesn't cost a
+   *  second doc.getPage() round trip. */
+  async function loadLinksForPage(entry: PageEntry, doc: PDFDocumentProxy, docToken: number, page: PDFPageProxy) {
+    const annots = await page.getAnnotations({ intent: 'display' })
+    if (docToken !== renderToken || pdfDoc !== doc) return
+    const viewport1x = page.getViewport({ scale: 1 })
+    const links: PdfLinkOverlay[] = []
+    for (const a of annots) {
+      if (a.annotationType !== AnnotationType.LINK || !a.rect) continue
+      const rect = annotationRectToPercent(
+        a.rect as [number, number, number, number],
+        (x, y) => viewport1x.convertToViewportPoint(x, y) as [number, number],
+        viewport1x.width,
+        viewport1x.height,
+      )
+      const id = String(a.id ?? `${entry.num}-${links.length}`)
+      if (a.url) {
+        links.push({ id, rect, url: a.url })
+      } else if (a.dest) {
+        const targetPage = await resolveDestinationPage(doc, a.dest)
+        if (docToken !== renderToken || pdfDoc !== doc) return
+        if (targetPage) links.push({ id, rect, targetPage })
+      }
+    }
+    entry.links = links
+  }
+
+  /** Navigate to a resolved link/outline target: external URL in the system
+   *  browser (never in-app — same policy as Preview.svelte's markdown link
+   *  handling), or scroll to a page within this same document. */
+  function navigateTo(target: { url?: string; targetPage?: number }) {
+    if (target.url) {
+      openUrl(target.url).catch((err) => statusMsg.set(`Couldn't open link: ${err}`))
+    } else if (target.targetPage) {
+      scrollToPage(target.targetPage)
+    }
+  }
+
+  function handleLinkClick(e: MouseEvent, link: PdfLinkOverlay) {
+    e.preventDefault()
+    navigateTo(link)
+  }
+
+  // Internal links have no natural `href` (there's no URL to navigate to —
+  // just an in-document destination), so unlike external links a plain
+  // <a> without one isn't keyboard-focusable/-activatable by default;
+  // tabindex + this handler cover Enter/Space the same way a real link's
+  // default href-driven behavior would.
+  function handleLinkKeydown(e: KeyboardEvent, link: PdfLinkOverlay) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      navigateTo(link)
+    }
+  }
+
+  async function handleOutlineSelect(node: OutlineNode) {
+    if (node.url) {
+      navigateTo({ url: node.url })
+      return
+    }
+    if (node.dest && pdfDoc) {
+      const targetPage = await resolveDestinationPage(pdfDoc, node.dest)
+      if (targetPage) navigateTo({ targetPage })
+    }
+  }
+
+  function toggleOutline() {
+    showOutline = !showOutline
   }
 
   function rerenderAllRendered() {
@@ -141,6 +237,8 @@
     numPages = 0
     visibleRatios.clear()
     currentPageNum = 1
+    outline = []
+    showOutline = false
     try {
       const lib = await ensurePdfjs()
       const task = lib.getDocument({ data: dataUrlToBytes(dataUrl) })
@@ -162,12 +260,30 @@
         const page = await doc.getPage(n)
         if (token !== renderToken) return // a newer load superseded this one mid-fetch
         const vp = page.getViewport({ scale: 1 })
-        entries.push({ num: n, width: vp.width, height: vp.height, rendered: false, renderGen: 0 })
+        entries.push({
+          num: n,
+          width: vp.width,
+          height: vp.height,
+          rendered: false,
+          renderGen: 0,
+          links: [],
+          linksLoaded: false,
+        })
       }
       if (token !== renderToken) return
       pdfDoc = doc
       numPages = doc.numPages
       pages = entries
+      // Table of contents, if this PDF has one — most don't, in which case
+      // this resolves to an empty array and the toolbar button stays hidden.
+      doc
+        .getOutline()
+        .then((nodes) => {
+          if (token === renderToken) outline = nodes ?? []
+        })
+        .catch(() => {
+          /* no outline, or it failed to parse — non-fatal, just hide the button */
+        })
       await tick() // let the DOM lay out the now correctly-sized page containers
       applyFitMode()
     } catch (e) {
@@ -281,40 +397,75 @@
 
 <div class="pdf-viewer">
   <div class="pdf-toolbar">
-    <span class="pdf-pagenav">
-      <button class="pdf-btn" onclick={prevPage} disabled={currentPageNum <= 1} aria-label="Previous page">‹</button>
-      <span class="pdf-page-indicator">{numPages ? `${currentPageNum} / ${numPages}` : '—'}</span>
-      <button class="pdf-btn" onclick={nextPage} disabled={currentPageNum >= numPages} aria-label="Next page">›</button>
-    </span>
-    <span class="pdf-fit">
-      <button class="pdf-btn" class:active={fitMode === 'width'} onclick={setFitWidth} title="Fit width" aria-label="Fit page width to the window">
-        <span class="nf-icon">{'\u{f084e}'}</span>
+    <div class="pdf-toolbar-group">
+      <button
+        class="pdf-btn"
+        class:active={showOutline}
+        onclick={toggleOutline}
+        disabled={outline.length === 0}
+        title={outline.length ? 'Table of contents' : 'This PDF has no table of contents'}
+        aria-label="Toggle table of contents"
+      >
+        <span class="nf-icon">{'\u{f0836}'}</span>
       </button>
-      <button class="pdf-btn" class:active={fitMode === 'page'} onclick={setFitPage} title="Fit page" aria-label="Fit whole page in the window">
-        <span class="nf-icon">{'\u{f0ef5}'}</span>
-      </button>
-    </span>
-    <span class="pdf-zoom">
-      <button class="pdf-btn" onclick={zoomOut} aria-label="Zoom out">−</button>
-      <button class="pdf-btn pdf-zoom-level" onclick={setActualSize} title="Actual size (100%)">{Math.round(zoom * 100)}%</button>
-      <button class="pdf-btn" onclick={zoomIn} aria-label="Zoom in">+</button>
-    </span>
+      <span class="pdf-pagenav">
+        <button class="pdf-btn" onclick={prevPage} disabled={currentPageNum <= 1} aria-label="Previous page">‹</button>
+        <span class="pdf-page-indicator">{numPages ? `${currentPageNum} / ${numPages}` : '—'}</span>
+        <button class="pdf-btn" onclick={nextPage} disabled={currentPageNum >= numPages} aria-label="Next page">›</button>
+      </span>
+    </div>
+    <div class="pdf-toolbar-group">
+      <span class="pdf-fit">
+        <button class="pdf-btn" class:active={fitMode === 'width'} onclick={setFitWidth} title="Fit width" aria-label="Fit page width to the window">
+          <span class="nf-icon">{'\u{f084e}'}</span>
+        </button>
+        <button class="pdf-btn" class:active={fitMode === 'page'} onclick={setFitPage} title="Fit page" aria-label="Fit whole page in the window">
+          <span class="nf-icon">{'\u{f0ef5}'}</span>
+        </button>
+      </span>
+      <span class="pdf-zoom">
+        <button class="pdf-btn" onclick={zoomOut} aria-label="Zoom out">−</button>
+        <button class="pdf-btn pdf-zoom-level" onclick={setActualSize} title="Actual size (100%)">{Math.round(zoom * 100)}%</button>
+        <button class="pdf-btn" onclick={zoomIn} aria-label="Zoom in">+</button>
+      </span>
+    </div>
   </div>
-  <div class="pdf-page-area" bind:this={scrollEl}>
-    {#if errorMsg}
-      <div class="pdf-error">{errorMsg}</div>
-    {:else if loading}
-      <div class="pdf-status">Loading PDF…</div>
-    {:else}
-      {#each pages as entry (entry.num)}
-        <div
-          class="pdf-page-container"
-          use:observePage={entry.num}
-          style="width:{entry.width * zoom}px; height:{entry.height * zoom}px"
-        >
-          <canvas use:bindCanvas={entry.num}></canvas>
-        </div>
-      {/each}
+  <div class="pdf-body">
+    {#if showOutline}
+      <nav class="pdf-outline-panel">
+        <PdfOutline items={outline} onSelect={handleOutlineSelect} />
+      </nav>
     {/if}
+    <div class="pdf-page-area" bind:this={scrollEl}>
+      {#if errorMsg}
+        <div class="pdf-error">{errorMsg}</div>
+      {:else if loading}
+        <div class="pdf-status">Loading PDF…</div>
+      {:else}
+        {#each pages as entry (entry.num)}
+          <div
+            class="pdf-page-container"
+            use:observePage={entry.num}
+            style="width:{entry.width * zoom}px; height:{entry.height * zoom}px"
+          >
+            <canvas use:bindCanvas={entry.num}></canvas>
+            {#each entry.links as link (link.id)}
+              <a
+                class="pdf-link"
+                href={link.url}
+                target={link.url ? '_blank' : undefined}
+                rel={link.url ? 'noopener noreferrer' : undefined}
+                title={link.url ?? (link.targetPage ? `Go to page ${link.targetPage}` : undefined)}
+                style="left:{link.rect.leftPct}%; top:{link.rect.topPct}%; width:{link.rect.widthPct}%; height:{link.rect.heightPct}%"
+                tabindex={link.url ? undefined : 0}
+                onclick={(e) => handleLinkClick(e, link)}
+                onkeydown={(e) => handleLinkKeydown(e, link)}
+              ></a>
+            {/each}
+          </div>
+        {/each}
+      {/if}
+    </div>
   </div>
 </div>
+
