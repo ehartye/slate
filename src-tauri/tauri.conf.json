@@ -45,6 +45,13 @@
         "name": "Markdown",
         "description": "Markdown Document",
         "role": "Editor"
+      },
+      {
+        "ext": ["pdf"],
+        "name": "PDF",
+        "description": "PDF Document",
+        "role": "Viewer",
+        "rank": "Alternate"
       }
     ]
   }

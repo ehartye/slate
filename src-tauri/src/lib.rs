@@ -219,8 +219,9 @@ fn read_pdf_as_data_url(path: String) -> Result<String, String> {
     Ok(format!("data:application/pdf;base64,{b64}"))
 }
 
-/// The markdown file passed on launch — via Apple Events on macOS or CLI args on Windows.
-/// Consumes the stored macOS value so it's only ever delivered to one window.
+/// The markdown/PDF file passed on launch — via Apple Events on macOS or CLI
+/// args on Windows. Consumes the stored macOS value so it's only ever
+/// delivered to one window.
 #[tauri::command]
 fn get_startup_file(state: tauri::State<OpenedFile>) -> Option<String> {
     // macOS: file delivered via Apple Events, stored in managed state
@@ -232,14 +233,7 @@ fn get_startup_file(state: tauri::State<OpenedFile>) -> Option<String> {
     // Windows: file delivered as a CLI argument
     std::env::args().skip(1).find(|a| {
         let p = std::path::Path::new(a);
-        p.is_file()
-            && p.extension()
-                .and_then(|e| e.to_str())
-                .map(|e| {
-                    let e = e.to_ascii_lowercase();
-                    e == "md" || e == "markdown"
-                })
-                .unwrap_or(false)
+        p.is_file() && files::is_launch_openable(p)
     })
 }
 
@@ -450,12 +444,7 @@ pub fn run() {
             if let tauri::RunEvent::Opened { urls } = &event {
                 let path = urls.iter().find_map(|url| {
                     url.to_file_path().ok().and_then(|p| {
-                        let ext = p
-                            .extension()
-                            .and_then(|e| e.to_str())
-                            .map(|e| e.to_ascii_lowercase())
-                            .unwrap_or_default();
-                        if p.is_file() && (ext == "md" || ext == "markdown") {
+                        if p.is_file() && files::is_launch_openable(&p) {
                             Some(p.to_string_lossy().to_string())
                         } else {
                             None

@@ -115,6 +115,16 @@ pub fn is_pdf(path: &Path) -> bool {
     has_extension(path, PDF_EXTENSIONS)
 }
 
+/// Whether `path` has an extension this app can be launched to open — via OS
+/// file-association double-click/"Open With" (macOS Apple Events, Windows
+/// CLI arg). Markdown loads as an editable tab, PDF as a read-only viewer
+/// tab; nothing else is wired into file associations at all. Must stay in
+/// sync with `tauri.conf.json`'s `bundle.fileAssociations`, which declares
+/// only these same two.
+pub fn is_launch_openable(path: &Path) -> bool {
+    has_extension(path, MD_EXTENSIONS) || is_pdf(path)
+}
+
 /// Return absolute paths of PDF files directly in `dir`, sorted by file name
 /// — listed alongside `text_files_in` when Markdown-only mode is off (PDF is
 /// part of the same "non-markdown" browsing surface, just not text). Dotfiles
@@ -339,6 +349,16 @@ mod tests {
         assert!(is_pdf(Path::new("A.PDF")));
         assert!(!is_pdf(Path::new("a.md")));
         assert!(!is_pdf(Path::new("a")));
+    }
+
+    #[test]
+    fn is_launch_openable_accepts_only_markdown_and_pdf() {
+        assert!(is_launch_openable(Path::new("a.md")));
+        assert!(is_launch_openable(Path::new("a.markdown")));
+        assert!(is_launch_openable(Path::new("A.PDF")));
+        assert!(!is_launch_openable(Path::new("a.txt")));
+        assert!(!is_launch_openable(Path::new("a.png")));
+        assert!(!is_launch_openable(Path::new("a")));
     }
 
     #[test]
