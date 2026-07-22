@@ -57,6 +57,8 @@ body { font-family: var(--ui-font); color: var(--fg); background: var(--bg); }
   border-radius: 8px; padding: 5px 11px; cursor: pointer; font: inherit; font-size: 12.5px;
   display: inline-flex; align-items: center; gap: 5px; }
 .browser-btn:hover { border-color: var(--accent); color: var(--accent); }
+.browser-btn:disabled { opacity: 0.35; cursor: default; }
+.browser-btn:disabled:hover { border-color: var(--border); color: var(--fg); }
 /* A toggle button in its "off" state (e.g. Markdown-only mode disabled). */
 .browser-btn.off { opacity: 0.5; }
 .browser-btn.off:hover { opacity: 1; }
@@ -179,6 +181,24 @@ body { font-family: var(--ui-font); color: var(--fg); background: var(--bg); }
 .cm-host .cm-activeLineGutter { background: var(--accent-soft); color: var(--fg); }
 .cm-host .cm-activeLine { background: var(--accent-soft); }
 .empty { padding: 40px 28px; color: var(--fg-muted); font-size: 14px; }
+
+/* ── PDF viewer ─────────────────────────────────────────── */
+.pdf-viewer { display: flex; flex-direction: column; height: 100%; }
+.pdf-toolbar { display: flex; align-items: center; justify-content: space-between; flex: 0 0 auto;
+  padding: 6px 10px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); }
+.pdf-pagenav, .pdf-zoom { display: inline-flex; align-items: center; gap: 2px; }
+.pdf-btn { background: none; border: 1px solid var(--border); color: var(--fg-muted);
+  font: inherit; cursor: pointer; border-radius: 5px; padding: 1px 8px; line-height: 1.5; }
+.pdf-btn:hover { color: var(--fg); border-color: var(--accent); }
+.pdf-btn:disabled { opacity: 0.35; cursor: default; }
+.pdf-btn:disabled:hover { color: var(--fg-muted); border-color: var(--border); }
+.pdf-zoom-level { min-width: 46px; text-align: center; border-color: transparent; }
+.pdf-page-indicator { color: var(--fg-muted); font-size: 12px; min-width: 64px; text-align: center; }
+.pdf-page-area { flex: 1; min-height: 0; overflow: auto; display: flex;
+  justify-content: center; padding: 18px; background: var(--bg); }
+.pdf-page-area canvas { box-shadow: var(--shadow); height: fit-content; }
+.pdf-status, .pdf-error { padding: 40px 28px; color: var(--fg-muted); font-size: 14px; }
+.pdf-error { color: var(--accent); }
 
 /* pane headers + collapse rails */
 .pane-head { display: flex; align-items: center; justify-content: space-between; flex: 0 0 auto;

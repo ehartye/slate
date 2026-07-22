@@ -5,6 +5,7 @@
   import TabBar from '$lib/components/TabBar.svelte'
   import Editor from '$lib/components/Editor.svelte'
   import Preview from '$lib/components/Preview.svelte'
+  import PdfViewer from '$lib/components/PdfViewer.svelte'
   import { onMount } from 'svelte'
   import { invoke } from '@tauri-apps/api/core'
   import { listen } from '@tauri-apps/api/event'
@@ -16,7 +17,7 @@
   import { writeFile, readFile, openNewWindow, baseName } from '$lib/tauri'
   import { loadFile } from '$lib/workspace'
   import { closeTab, cycleTab, markBackgroundTabForReload } from '$lib/tabs'
-  import { isMarkdownPath } from '$lib/fileKind'
+  import { isMarkdownPath, isPdfPath } from '$lib/fileKind'
   import { loadZoom, setZoom, nudgeZoom } from '$lib/zoom'
   import { loadSidebarWidth, clampSidebarWidth, persistSidebarWidth } from '$lib/sidebarWidth'
   import { loadMdOnlyMode, loadShowHiddenFiles } from '$lib/viewOptions'
@@ -39,6 +40,11 @@
 
   let previewPane = $state<HTMLElement>()
   let editorFlex = $state(1)
+  // A pdf tab has no CodeMirror doc at all, so the Editor pane (and its
+  // collapse rail) is hidden entirely and the preview/pdf pane always shows
+  // full-width, regardless of the user's editorCollapsed/previewCollapsed
+  // preferences for text tabs — there'd be nothing else to display otherwise.
+  let isPdfActive = $derived(isPdfPath($currentFile))
   // Paths whose *next* file-changed event should be ignored (our own save,
   // not an external edit) — per-path since several tabs can be open at once.
   let suppressNextChangeFor = new Set<string>()
@@ -225,42 +231,46 @@
     <div class="content-area">
       <TabBar />
       <div class="split">
-      {#if $editorCollapsed}
-        <button class="rail" onclick={() => editorCollapsed.set(false)} title="Expand editor">
-          <span class="rail-icon">›</span><span class="rail-label">Editor</span>
-        </button>
-      {:else}
-        <main class="editor-pane pane" style="flex:{$previewCollapsed ? 1 : editorFlex}">
-          <div class="pane-head">
-            <span class="label">Editor</span>
-            {#if !$previewCollapsed}
-              <button class="collapse-btn" onclick={() => editorCollapsed.set(true)} title="Collapse editor">‹</button>
-            {/if}
-          </div>
-          <div class="pane-content">
-            {#if $currentFile}<Editor />{:else}<div class="empty">Choose a folder, then pick a file to edit.</div>{/if}
-          </div>
-        </main>
+      {#if !isPdfActive}
+        {#if $editorCollapsed}
+          <button class="rail" onclick={() => editorCollapsed.set(false)} title="Expand editor">
+            <span class="rail-icon">›</span><span class="rail-label">Editor</span>
+          </button>
+        {:else}
+          <main class="editor-pane pane" style="flex:{$previewCollapsed ? 1 : editorFlex}">
+            <div class="pane-head">
+              <span class="label">Editor</span>
+              {#if !$previewCollapsed}
+                <button class="collapse-btn" onclick={() => editorCollapsed.set(true)} title="Collapse editor">‹</button>
+              {/if}
+            </div>
+            <div class="pane-content">
+              {#if $currentFile}<Editor />{:else}<div class="empty">Choose a folder, then pick a file to edit.</div>{/if}
+            </div>
+          </main>
+        {/if}
+
+        {#if !$editorCollapsed && !$previewCollapsed}
+          <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+          <div class="divider" onmousedown={startDrag} role="separator" aria-orientation="vertical" aria-label="Resize editor and preview"></div>
+        {/if}
       {/if}
 
-      {#if !$editorCollapsed && !$previewCollapsed}
-        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-        <div class="divider" onmousedown={startDrag} role="separator" aria-orientation="vertical" aria-label="Resize editor and preview"></div>
-      {/if}
-
-      {#if $previewCollapsed}
+      {#if $previewCollapsed && !isPdfActive}
         <button class="rail right" onclick={() => previewCollapsed.set(false)} title="Expand preview">
           <span class="rail-icon">‹</span><span class="rail-label">Preview</span>
         </button>
       {:else}
-        <section class="preview-pane pane" style="flex:{$editorCollapsed ? 1 : 1}">
+        <section class="preview-pane pane" style="flex:1">
           <div class="pane-head">
-            <span class="label">Preview</span>
-            {#if !$editorCollapsed}
+            <span class="label">{isPdfActive ? 'PDF' : 'Preview'}</span>
+            {#if !$editorCollapsed && !isPdfActive}
               <button class="collapse-btn" onclick={() => previewCollapsed.set(true)} title="Collapse preview">›</button>
             {/if}
           </div>
-          <div class="pane-content preview-scroll" bind:this={previewPane}><Preview /></div>
+          <div class="pane-content preview-scroll" bind:this={previewPane}>
+            {#if isPdfActive}<PdfViewer />{:else}<Preview />{/if}
+          </div>
         </section>
       {/if}
       </div>

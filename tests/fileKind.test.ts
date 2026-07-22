@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { extensionOf, isMarkdownPath, renderNonMarkdownPreview } from '../src/lib/fileKind'
+import { extensionOf, isMarkdownPath, isPdfPath, renderNonMarkdownPreview } from '../src/lib/fileKind'
 
 describe('extensionOf', () => {
   it('returns the lowercased extension', () => {
@@ -20,6 +20,18 @@ describe('isMarkdownPath', () => {
     expect(isMarkdownPath('/docs/a.txt')).toBe(false)
     expect(isMarkdownPath('/src/main.rs')).toBe(false)
     expect(isMarkdownPath(null)).toBe(false)
+  })
+})
+
+describe('isPdfPath', () => {
+  it('accepts .pdf, case-insensitively', () => {
+    expect(isPdfPath('/docs/report.pdf')).toBe(true)
+    expect(isPdfPath('/docs/REPORT.PDF')).toBe(true)
+  })
+  it('rejects other extensions and null', () => {
+    expect(isPdfPath('/docs/a.md')).toBe(false)
+    expect(isPdfPath('/docs/a.txt')).toBe(false)
+    expect(isPdfPath(null)).toBe(false)
   })
 })
 

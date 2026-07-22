@@ -150,11 +150,15 @@ fn list_markdown_files(folder: String, show_hidden: bool) -> Result<Vec<String>,
 }
 
 /// Listing used when "Markdown only" mode is off: every recognized text/code
-/// file, not just `.md`/`.markdown`.
+/// file, not just `.md`/`.markdown` — plus PDFs, which join the same
+/// "non-markdown" browsing surface despite being binary (they're read via
+/// `read_pdf_as_data_url`, never through `read_file`/`text_files_in`).
 #[tauri::command]
 fn list_text_files(folder: String, show_hidden: bool) -> Result<Vec<String>, String> {
-    let paths = files::text_files_in(std::path::Path::new(&folder), show_hidden)
-        .map_err(|e| e.to_string())?;
+    let dir = std::path::Path::new(&folder);
+    let mut paths = files::text_files_in(dir, show_hidden).map_err(|e| e.to_string())?;
+    paths.extend(files::pdf_files_in(dir, show_hidden).map_err(|e| e.to_string())?);
+    paths.sort_by_key(|p| p.file_name().map(|n| n.to_ascii_lowercase()));
     Ok(paths
         .into_iter()
         .map(|p| p.to_string_lossy().to_string())
@@ -198,6 +202,21 @@ fn resolve_image_data_url(base: String, href: String) -> Result<Option<String>, 
     let mime = files::image_mime(&path);
     let b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, bytes);
     Ok(Some(format!("data:{mime};base64,{b64}")))
+}
+
+/// Read a PDF file's bytes as a `data:` URL, for the frontend's bundled
+/// PDF.js viewer to load — a PDF is binary, so unlike markdown/text files it
+/// never goes through `read_file`. Mirrors `resolve_image_data_url`'s
+/// bytes-to-base64 pattern.
+#[tauri::command]
+fn read_pdf_as_data_url(path: String) -> Result<String, String> {
+    let p = std::path::Path::new(&path);
+    if !files::is_pdf(p) {
+        return Err("not a PDF file".to_string());
+    }
+    let bytes = std::fs::read(p).map_err(|e| e.to_string())?;
+    let b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, bytes);
+    Ok(format!("data:application/pdf;base64,{b64}"))
 }
 
 /// The markdown file passed on launch — via Apple Events on macOS or CLI args on Windows.
@@ -393,6 +412,7 @@ pub fn run() {
             read_file,
             resolve_md_link,
             resolve_image_data_url,
+            read_pdf_as_data_url,
             write_file,
             watch_file,
             unwatch_file,

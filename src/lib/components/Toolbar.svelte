@@ -13,9 +13,14 @@
   import { renderMarkdown } from '$lib/markdown'
   import { buildStandaloneHtml, collectThemeFontCss, collectMermaidScript } from '$lib/export'
   import { inlineLocalImages } from '$lib/images'
+  import { isPdfPath } from '$lib/fileKind'
   import ThemePanel from './ThemePanel.svelte'
 
   let panelOpen = $state(false)
+  // Exporting a PDF tab's ($content is empty/inert for those — see tabs.ts)
+  // rendered-as-markdown HTML would be meaningless; the button is disabled
+  // instead, rather than silently producing a blank export.
+  let isPdfActive = $derived(isPdfPath($currentFile))
 
   // Current theme variant (for the toolbar button's swatch + label).
   let current = $derived(
@@ -34,6 +39,7 @@
   })
 
   async function openInBrowser() {
+    if (isPdfActive) return // nothing meaningful to export for a pdf tab
     const theme = $themes.find((t) => t.name === $activeThemeName && t.mode === $activeMode)
     const fontCss = await collectThemeFontCss(theme?.css ?? '')
     let bodyHtml = renderMarkdown($content)
@@ -126,7 +132,8 @@
   <button
     class="browser-btn"
     onclick={openInBrowser}
-    title="Open the rendered document in your browser"
+    disabled={isPdfActive}
+    title={isPdfActive ? 'Not available for PDF files' : 'Open the rendered document in your browser'}
     aria-label="Open in browser"
   >
     <span class="nf-icon">{'\uf08e'}</span>

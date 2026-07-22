@@ -45,7 +45,8 @@
     "markdown-it-sup": "^2.0.0",
     "markdown-it-table-of-contents": "^1.2.0",
     "markdown-it-task-lists": "^2.1.1",
-    "mermaid": "^11.16.0"
+    "mermaid": "^11.16.0",
+    "pdfjs-dist": "^6.1.200"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.6",
