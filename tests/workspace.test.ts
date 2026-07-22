@@ -3,22 +3,28 @@ import { get } from 'svelte/store'
 
 vi.mock('../src/lib/tauri', async (importOriginal) => {
   const orig = await importOriginal<typeof import('../src/lib/tauri')>()
-  return { ...orig, listMarkdownFiles: vi.fn(), listSubfolders: vi.fn(), readFile: vi.fn() }
+  return {
+    ...orig,
+    listMarkdownFiles: vi.fn(), listTextFiles: vi.fn(), listSubfolders: vi.fn(), readFile: vi.fn(),
+  }
 })
 
-import { loadFile, refreshWorkspace, browseFolder, folderUp } from '../src/lib/workspace'
-import { listMarkdownFiles, listSubfolders, readFile } from '../src/lib/tauri'
+import { loadFile, refreshWorkspace, browseFolder, folderUp, relistCurrentFolder } from '../src/lib/workspace'
+import { listMarkdownFiles, listTextFiles, listSubfolders, readFile } from '../src/lib/tauri'
 import {
   content, currentFile, currentFolder, files, folders, dirty, statusMsg, reloadTrigger,
+  mdOnlyMode, showHiddenFiles, tabs, activeTabId,
 } from '../src/lib/stores'
 
 const mockList = vi.mocked(listMarkdownFiles)
+const mockTextList = vi.mocked(listTextFiles)
 const mockSubfolders = vi.mocked(listSubfolders)
 const mockRead = vi.mocked(readFile)
 
 beforeEach(() => {
   vi.clearAllMocks()
   mockSubfolders.mockResolvedValue([])
+  mockTextList.mockResolvedValue([])
   content.set('')
   currentFile.set(null)
   currentFolder.set(null)
@@ -27,10 +33,14 @@ beforeEach(() => {
   dirty.set(false)
   statusMsg.set('')
   reloadTrigger.set(0)
+  mdOnlyMode.set(true)
+  showHiddenFiles.set(false)
+  tabs.set([])
+  activeTabId.set(null)
 })
 
 describe('loadFile', () => {
-  it('loads the parent folder and opens the file', async () => {
+  it('loads the parent folder and opens the file as a new tab', async () => {
     mockList.mockResolvedValue(['C:\\docs\\a.md', 'C:\\docs\\b.md'])
     mockSubfolders.mockResolvedValue(['C:\\docs\\sub'])
     mockRead.mockResolvedValue('# hello')
@@ -43,6 +53,8 @@ describe('loadFile', () => {
     expect(get(content)).toBe('# hello')
     expect(get(currentFile)).toBe('C:\\docs\\b.md')
     expect(get(dirty)).toBe(false)
+    expect(get(tabs).map((t) => t.path)).toEqual(['C:\\docs\\b.md'])
+    expect(get(activeTabId)).toBe(get(tabs)[0].id)
   })
 
   it('surfaces a read failure via statusMsg', async () => {
@@ -139,6 +151,56 @@ describe('folderUp', () => {
     currentFolder.set('/')
 
     await folderUp()
+
+    expect(mockList).not.toHaveBeenCalled()
+  })
+})
+
+describe('listWorkspace mode-awareness (via browseFolder)', () => {
+  it('uses listMarkdownFiles when mdOnlyMode is on (default)', async () => {
+    mockList.mockResolvedValue(['/docs/a.md'])
+
+    await browseFolder('/docs')
+
+    expect(mockList).toHaveBeenCalledWith('/docs', false)
+    expect(mockTextList).not.toHaveBeenCalled()
+    expect(get(files)).toEqual(['/docs/a.md'])
+  })
+
+  it('uses listTextFiles when mdOnlyMode is off', async () => {
+    mdOnlyMode.set(false)
+    mockTextList.mockResolvedValue(['/docs/a.md', '/docs/main.rs'])
+
+    await browseFolder('/docs')
+
+    expect(mockTextList).toHaveBeenCalledWith('/docs', false)
+    expect(mockList).not.toHaveBeenCalled()
+    expect(get(files)).toEqual(['/docs/a.md', '/docs/main.rs'])
+  })
+
+  it('passes showHiddenFiles through to both listings', async () => {
+    showHiddenFiles.set(true)
+    mockList.mockResolvedValue([])
+
+    await browseFolder('/docs')
+
+    expect(mockList).toHaveBeenCalledWith('/docs', true)
+    expect(mockSubfolders).toHaveBeenCalledWith('/docs', true)
+  })
+})
+
+describe('relistCurrentFolder', () => {
+  it('re-lists the current folder', async () => {
+    currentFolder.set('/docs')
+    mockList.mockResolvedValue(['/docs/a.md'])
+
+    await relistCurrentFolder()
+
+    expect(get(files)).toEqual(['/docs/a.md'])
+  })
+
+  it('is a no-op when no folder is set', async () => {
+    await relistCurrentFolder()
 
     expect(mockList).not.toHaveBeenCalled()
   })

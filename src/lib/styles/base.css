@@ -57,8 +57,15 @@ body { font-family: var(--ui-font); color: var(--fg); background: var(--bg); }
   border-radius: 8px; padding: 5px 11px; cursor: pointer; font: inherit; font-size: 12.5px;
   display: inline-flex; align-items: center; gap: 5px; }
 .browser-btn:hover { border-color: var(--accent); color: var(--accent); }
-.browser-btn .arrow { transition: transform .2s ease; }
-.browser-btn:hover .arrow { transform: translate(2px, -2px); }
+/* A toggle button in its "off" state (e.g. Markdown-only mode disabled). */
+.browser-btn.off { opacity: 0.5; }
+.browser-btn.off:hover { opacity: 1; }
+/* Nerd Font icon glyphs (independent of the active theme's --ui-font, which
+   usually isn't a Nerd Font) — falls back to a plain glyphless box if none
+   of these are installed. */
+.nf-icon { font-family: 'Symbols Nerd Font Mono', 'Symbols Nerd Font',
+  'CaskaydiaCove Nerd Font Mono', 'JetBrainsMono Nerd Font', 'Hack Nerd Font', sans-serif;
+  font-size: 15px; line-height: 1; }
 
 /* ── Theme button + gallery panel ──────────────────────── */
 .theme-open-btn { display: inline-flex; align-items: center; gap: 8px; background: var(--bg);
@@ -134,7 +141,25 @@ body { font-family: var(--ui-font); color: var(--fg); background: var(--bg); }
 .context-menu button:hover { background: var(--accent-soft); color: var(--accent); }
 
 /* ── Editor / preview split ────────────────────────────── */
-.split { flex: 1; display: flex; min-width: 0; }
+.content-area { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+
+.tabbar { flex: 0 0 auto; display: flex; overflow-x: auto; background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border); }
+.tab { flex: 0 0 auto; display: flex; align-items: center; max-width: 220px;
+  border-right: 1px solid var(--border); background: none; }
+.tab.active { background: var(--bg); box-shadow: inset 0 -2px 0 var(--accent); }
+.tab-open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px;
+  background: none; border: 0; color: var(--fg-muted); cursor: pointer; font: inherit;
+  font-size: 12.5px; padding: 7px 4px 7px 12px; }
+.tab.active .tab-open { color: var(--fg); }
+.tab-open:hover { color: var(--fg); }
+.tab-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tab-dot { flex: 0 0 auto; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.tab-close { flex: 0 0 auto; background: none; border: 0; color: var(--fg-muted); cursor: pointer;
+  font-size: 15px; line-height: 1; padding: 4px 10px; }
+.tab-close:hover { color: var(--accent); }
+
+.split { flex: 1; display: flex; min-width: 0; min-height: 0; }
 .divider { width: 6px; cursor: col-resize; background: var(--border); flex: 0 0 auto; }
 .divider:hover { background: var(--accent); }
 .editor-pane, .preview-pane { flex: 1; min-width: 0; }
@@ -203,6 +228,8 @@ mark.find-hit-active { background: var(--accent); color: var(--bg); }
 .statusbar .unsaved { color: var(--accent); }
 .statusbar .msg { color: var(--accent); }
 .statusbar .hint { color: var(--fg-muted); }
+.statusbar .readonly { color: var(--fg-muted); text-transform: uppercase; font-size: 10.5px;
+  letter-spacing: 0.08em; border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; }
 .statusbar .zoom { display: inline-flex; align-items: center; gap: 2px; }
 .statusbar .zoom-btn, .statusbar .zoom-level {
   background: none; border: 1px solid var(--border); color: var(--fg-muted);

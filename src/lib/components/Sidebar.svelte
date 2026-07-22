@@ -1,9 +1,14 @@
 <script lang="ts">
   import { open } from '@tauri-apps/plugin-dialog'
   import { revealItemInDir } from '@tauri-apps/plugin-opener'
-  import { currentFolder, files, folders, currentFile, content, dirty, statusMsg, sidebarWidth } from '$lib/stores'
-  import { readFile, baseName, dirName } from '$lib/tauri'
-  import { loadFile, refreshWorkspace, browseFolder, folderUp } from '$lib/workspace'
+  import {
+    currentFolder, files, folders, currentFile, statusMsg, sidebarWidth,
+    showHiddenFiles, mdOnlyMode,
+  } from '$lib/stores'
+  import { baseName, dirName } from '$lib/tauri'
+  import { loadFile, refreshWorkspace, browseFolder, folderUp, relistCurrentFolder } from '$lib/workspace'
+  import { openTab } from '$lib/tabs'
+  import { setShowHiddenFiles } from '$lib/viewOptions'
 
   // The up button is enabled only when the current folder actually has a
   // parent to navigate to (e.g. disabled at a filesystem root).
@@ -19,21 +24,17 @@
 
   async function chooseFile() {
     const picked = await open({
-      filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }],
+      // Markdown-only mode restricts the picker to match; off, any file
+      // can be picked (the sidebar's own listing is the curated browse view).
+      filters: $mdOnlyMode ? [{ name: 'Markdown', extensions: ['md', 'markdown'] }] : undefined,
     })
     if (typeof picked !== 'string') return
     await loadFile(picked)
   }
 
-  async function openFile(path: string) {
-    try {
-      const text = await readFile(path)
-      content.set(text)
-      currentFile.set(path)
-      dirty.set(false)
-    } catch (e) {
-      statusMsg.set(`Could not open file: ${e}`)
-    }
+  async function toggleHiddenFiles() {
+    setShowHiddenFiles(!$showHiddenFiles)
+    await relistCurrentFolder()
   }
 
   function showContextMenu(e: MouseEvent, path: string) {
@@ -73,7 +74,17 @@
     <button class="folder-btn" onclick={chooseFolder} title="Choose folder…">
       {$currentFolder ? baseName($currentFolder) : 'Choose folder…'}
     </button>
-    <button class="icon-btn" onclick={chooseFile} title="Open markdown file…">🗎</button>
+    <button class="icon-btn" onclick={chooseFile} title={$mdOnlyMode ? 'Open markdown file…' : 'Open file…'}>🗎</button>
+    <button
+      class="icon-btn"
+      class:off={!$showHiddenFiles}
+      onclick={toggleHiddenFiles}
+      title={$showHiddenFiles ? 'Hide hidden files' : 'Show hidden files'}
+      aria-label="Toggle hidden files"
+      aria-pressed={$showHiddenFiles}
+    >
+      <span class="nf-icon">{$showHiddenFiles ? '\u{f0208}' : '\u{f0209}'}</span>
+    </button>
     <button class="icon-btn" onclick={refreshWorkspace} title="Refresh file list and reload from disk">⟳</button>
   </div>
   <ul>
@@ -88,7 +99,7 @@
       <li>
         <button
           class:active={$currentFile === path}
-          onclick={() => openFile(path)}
+          onclick={() => openTab(path)}
           oncontextmenu={(e) => showContextMenu(e, path)}
         >
           {baseName(path)}
