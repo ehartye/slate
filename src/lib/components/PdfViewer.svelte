@@ -287,8 +287,12 @@
       <button class="pdf-btn" onclick={nextPage} disabled={currentPageNum >= numPages} aria-label="Next page">›</button>
     </span>
     <span class="pdf-fit">
-      <button class="pdf-btn" class:active={fitMode === 'width'} onclick={setFitWidth} title="Fit page width to the window">Width</button>
-      <button class="pdf-btn" class:active={fitMode === 'page'} onclick={setFitPage} title="Fit whole page in the window">Page</button>
+      <button class="pdf-btn" class:active={fitMode === 'width'} onclick={setFitWidth} title="Fit width" aria-label="Fit page width to the window">
+        <span class="nf-icon">{'\u{f084e}'}</span>
+      </button>
+      <button class="pdf-btn" class:active={fitMode === 'page'} onclick={setFitPage} title="Fit page" aria-label="Fit whole page in the window">
+        <span class="nf-icon">{'\u{f0ef5}'}</span>
+      </button>
     </span>
     <span class="pdf-zoom">
       <button class="pdf-btn" onclick={zoomOut} aria-label="Zoom out">−</button>
