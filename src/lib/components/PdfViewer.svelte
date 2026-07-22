@@ -11,7 +11,12 @@
   let errorMsg = $state('')
 
   let pdfjsLib: typeof import('pdfjs-dist') | null = null
-  let pdfDoc: PDFDocumentProxy | null = null
+  // $state.raw, not $state: we only ever reassign this wholesale (never
+  // mutate it in place), and deep-proxying a pdf.js class instance would
+  // risk breaking its internal method/field access. Needs to be reactive
+  // (not a plain `let`) so the render $effect below actually re-fires once
+  // a doc finishes loading — see the bug this fixed in loadDoc's comment.
+  let pdfDoc = $state.raw<PDFDocumentProxy | null>(null)
   // `destroy()` lives on the loading task returned by getDocument(), not on
   // the PDFDocumentProxy it resolves to — keep it around to release the
   // worker/cached resources when replaced or the component unmounts.
@@ -64,10 +69,17 @@
         task.destroy()
         return
       }
+      // Rendering happens in the `$effect` below, triggered by `pdfDoc`
+      // changing — not here. The <canvas> doesn't exist in the DOM yet at
+      // this point (`loading` is still true, so the template shows "Loading
+      // PDF…" instead of the canvas), so calling renderPage() here directly
+      // would just bail immediately on a null canvas ref. This used to be a
+      // real bug: pdfDoc was a plain (non-reactive) variable, so nothing
+      // ever retried the render once the canvas (re)appeared after `loading`
+      // flipped back to false.
       pdfDoc = doc
       numPages = doc.numPages
       pageNum = 1
-      await renderPage()
     } catch (e) {
       if (token === renderToken) errorMsg = `Could not render PDF: ${e}`
     } finally {
