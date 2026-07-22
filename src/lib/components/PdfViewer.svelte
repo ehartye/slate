@@ -1,27 +1,59 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte'
+  import { onMount, onDestroy, tick } from 'svelte'
   import { pdfDataUrl } from '$lib/stores'
+  import {
+    fitWidthScale,
+    fitPageScale,
+    clampZoom,
+    currentPageFromVisibility,
+  } from '$lib/pdfLayout'
   import type { PDFDocumentProxy, PDFDocumentLoadingTask } from 'pdfjs-dist'
 
-  let canvas = $state<HTMLCanvasElement>()
-  let pageNum = $state(1)
+  type FitMode = 'width' | 'page' | 'custom'
+  type PageEntry = {
+    num: number
+    width: number // at scale 1, in PDF points
+    height: number // at scale 1, in PDF points
+    rendered: boolean
+    renderGen: number // per-page staleness guard — see renderPage
+  }
+
+  // Horizontal padding .pdf-page-area applies in base.css — kept in sync
+  // with that value so "fit width" leaves the same breathing room on both
+  // sides instead of computing a scale that would need side-scrolling.
+  const AREA_PADDING_X = 18
+
+  let scrollEl = $state<HTMLDivElement>()
+  let pages = $state<PageEntry[]>([])
   let numPages = $state(0)
   let zoom = $state(1)
+  let fitMode = $state<FitMode>('width')
+  let currentPageNum = $state(1)
   let loading = $state(false)
   let errorMsg = $state('')
 
   let pdfjsLib: typeof import('pdfjs-dist') | null = null
   // $state.raw, not $state: we only ever reassign this wholesale (never
   // mutate it in place), and deep-proxying a pdf.js class instance would
-  // risk breaking its internal method/field access. Needs to be reactive
-  // (not a plain `let`) so the render $effect below actually re-fires once
-  // a doc finishes loading — see the bug this fixed in loadDoc's comment.
+  // risk breaking its internal method/field access. Also lets renderPage
+  // compare `pdfDoc !== doc` by identity — a $state proxy would never equal
+  // the raw object `task.promise` resolves to.
   let pdfDoc = $state.raw<PDFDocumentProxy | null>(null)
   // `destroy()` lives on the loading task returned by getDocument(), not on
   // the PDFDocumentProxy it resolves to — keep it around to release the
   // worker/cached resources when replaced or the component unmounts.
   let loadingTask: PDFDocumentLoadingTask | null = null
-  let renderToken = 0 // guards against a stale render finishing after a newer one started
+  let renderToken = 0 // bumped per doc load; guards stale async work from a superseded document
+
+  // Canvas elements, keyed by page number. Deliberately NOT part of the
+  // reactive `pages` array/state — plain DOM refs, populated/cleared by the
+  // bindCanvas action as page containers mount/unmount (e.g. on doc reload).
+  const canvasRefs = new Map<number, HTMLCanvasElement>()
+  // Each page container's visible fraction, from the shared IntersectionObserver
+  // below — feeds currentPageFromVisibility() to drive the page indicator.
+  const visibleRatios = new Map<number, number>()
+  let pageObserver: IntersectionObserver | null = null
+  let resizeObserver: ResizeObserver | null = null
 
   /** pdf.js needs a worker script; dynamically imported (and only wired up
    *  once) so its ~470KB isn't paid until a PDF tab is actually opened
@@ -52,18 +84,50 @@
     return bytes
   }
 
-  async function renderPage() {
-    if (!pdfDoc || !canvas) return
-    const token = renderToken
-    const page = await pdfDoc.getPage(pageNum)
+  /** Render (or re-render) one page's canvas at the current zoom — called
+   *  when a page first scrolls into view, and again for every
+   *  already-rendered page whenever the zoom changes. `renderGen` guards
+   *  against rapid successive calls for the *same* page (e.g. someone
+   *  mashing zoom in/out): only the most recently-started call for a given
+   *  page is allowed to actually touch its canvas, so an older, slower call
+   *  can't clobber it after a newer one already finished. */
+  async function renderPage(entry: PageEntry) {
+    const doc = pdfDoc
+    const canvas = canvasRefs.get(entry.num)
+    if (!doc || !canvas) return
+    const docToken = renderToken
+    entry.renderGen += 1
+    const gen = entry.renderGen
+    const page = await doc.getPage(entry.num)
+    if (docToken !== renderToken || pdfDoc !== doc || gen !== entry.renderGen) return
     const dpr = window.devicePixelRatio || 1
     const viewport = page.getViewport({ scale: zoom * dpr })
-    if (token !== renderToken || !canvas) return // superseded by a newer page/zoom/doc change
     canvas.width = viewport.width
     canvas.height = viewport.height
-    canvas.style.width = `${viewport.width / dpr}px`
-    canvas.style.height = `${viewport.height / dpr}px`
     await page.render({ canvas, viewport }).promise
+  }
+
+  function rerenderAllRendered() {
+    for (const entry of pages) {
+      if (entry.rendered) void renderPage(entry)
+    }
+  }
+
+  /** Recompute `zoom` from the current fit mode against the scroll
+   *  container's available size, using the first page as the reference
+   *  (PDFs may mix page sizes, but nearly always don't — a single shared
+   *  zoom per the whole continuous-scroll list is standard PDF-reader UX).
+   *  No-op in 'custom' mode (the user picked a specific zoom manually). */
+  function applyFitMode() {
+    if (fitMode === 'custom' || !scrollEl || pages.length === 0) return
+    const ref = pages[0]
+    const availW = scrollEl.clientWidth - AREA_PADDING_X * 2
+    const availH = scrollEl.clientHeight
+    zoom =
+      fitMode === 'width'
+        ? fitWidthScale(availW, ref.width)
+        : fitPageScale(availW, availH, ref.width, ref.height)
+    rerenderAllRendered()
   }
 
   async function loadDoc(dataUrl: string) {
@@ -73,6 +137,10 @@
     errorMsg = ''
     loadingTask?.destroy()
     pdfDoc = null
+    pages = []
+    numPages = 0
+    visibleRatios.clear()
+    currentPageNum = 1
     try {
       const lib = await ensurePdfjs()
       const task = lib.getDocument({ data: dataUrlToBytes(dataUrl) })
@@ -83,19 +151,27 @@
         task.destroy()
         return
       }
-      // Rendering happens in the `$effect` below, triggered by `pdfDoc`
-      // changing — not here. The <canvas> doesn't exist in the DOM yet at
-      // this point (`loading` is still true, so the template shows "Loading
-      // PDF…" instead of the canvas), so calling renderPage() here directly
-      // would just bail immediately on a null canvas ref. This used to be a
-      // real bug: pdfDoc was a plain (non-reactive) variable, so nothing
-      // ever retried the render once the canvas (re)appeared after `loading`
-      // flipped back to false.
+      // Fetch every page's scale-1 dimensions upfront so the continuous
+      // scroll list can be laid out (and scrollbar-sized) correctly right
+      // away — getPage() just parses a page's dictionary, not its content
+      // stream, so this is cheap even for a document of a few hundred pages.
+      // Actual pixel rendering stays lazy (triggered by the
+      // IntersectionObserver below as each page scrolls into view).
+      const entries: PageEntry[] = []
+      for (let n = 1; n <= doc.numPages; n++) {
+        const page = await doc.getPage(n)
+        if (token !== renderToken) return // a newer load superseded this one mid-fetch
+        const vp = page.getViewport({ scale: 1 })
+        entries.push({ num: n, width: vp.width, height: vp.height, rendered: false, renderGen: 0 })
+      }
+      if (token !== renderToken) return
       pdfDoc = doc
       numPages = doc.numPages
-      pageNum = 1
+      pages = entries
+      await tick() // let the DOM lay out the now correctly-sized page containers
+      applyFitMode()
     } catch (e) {
-      if (token === renderToken) errorMsg = `Could not render PDF: ${e}`
+      if (token === renderToken) errorMsg = `Could not load PDF: ${e}`
     } finally {
       if (token === renderToken) loading = false
     }
@@ -106,55 +182,135 @@
     if (url) void loadDoc(url)
   })
 
-  $effect(() => {
-    void pageNum
-    void zoom
-    if (pdfDoc) void renderPage()
+  function onIntersect(observed: IntersectionObserverEntry[]) {
+    for (const e of observed) {
+      const num = Number((e.target as HTMLElement).dataset.page)
+      if (!num) continue
+      visibleRatios.set(num, e.isIntersecting ? e.intersectionRatio : 0)
+      if (e.isIntersecting) {
+        const entry = pages.find((p) => p.num === num)
+        if (entry && !entry.rendered) {
+          entry.rendered = true
+          void renderPage(entry)
+        }
+      }
+    }
+    currentPageNum = currentPageFromVisibility(visibleRatios)
+  }
+
+  /** Action: registers a page container with the shared
+   *  IntersectionObserver, tagging it with its page number (read back in
+   *  onIntersect via the dataset) so lazy-rendering and the "current page"
+   *  indicator both know which page an intersection event is about. */
+  function observePage(node: HTMLElement, pageNum: number) {
+    node.dataset.page = String(pageNum)
+    pageObserver?.observe(node)
+    return {
+      destroy() {
+        pageObserver?.unobserve(node)
+      },
+    }
+  }
+
+  /** Action: tracks a page's canvas element in canvasRefs while it's
+   *  mounted — see canvasRefs' declaration for why this is a plain Map
+   *  rather than a field on the (reactive) PageEntry. */
+  function bindCanvas(node: HTMLCanvasElement, pageNum: number) {
+    canvasRefs.set(pageNum, node)
+    return {
+      destroy() {
+        if (canvasRefs.get(pageNum) === node) canvasRefs.delete(pageNum)
+      },
+    }
+  }
+
+  function scrollToPage(n: number) {
+    scrollEl?.querySelector<HTMLElement>(`[data-page="${n}"]`)?.scrollIntoView({ block: 'start' })
+  }
+  function prevPage() {
+    scrollToPage(Math.max(1, currentPageNum - 1))
+  }
+  function nextPage() {
+    scrollToPage(Math.min(numPages, currentPageNum + 1))
+  }
+
+  function setFitWidth() {
+    fitMode = 'width'
+    applyFitMode()
+  }
+  function setFitPage() {
+    fitMode = 'page'
+    applyFitMode()
+  }
+  function setActualSize() {
+    fitMode = 'custom'
+    zoom = 1
+    rerenderAllRendered()
+  }
+  function zoomOut() {
+    fitMode = 'custom'
+    zoom = clampZoom(Math.round((zoom - 0.25) * 100) / 100)
+    rerenderAllRendered()
+  }
+  function zoomIn() {
+    fitMode = 'custom'
+    zoom = clampZoom(Math.round((zoom + 0.25) * 100) / 100)
+    rerenderAllRendered()
+  }
+
+  onMount(() => {
+    if (scrollEl) {
+      pageObserver = new IntersectionObserver(onIntersect, {
+        root: scrollEl,
+        rootMargin: '75% 0px', // pre-render up to ~3/4 screen ahead/behind for smooth scrolling
+        threshold: [0, 0.25, 0.5, 0.75, 1],
+      })
+      resizeObserver = new ResizeObserver(() => applyFitMode())
+      resizeObserver.observe(scrollEl)
+    }
+    return () => {
+      pageObserver?.disconnect()
+      resizeObserver?.disconnect()
+    }
   })
 
   onDestroy(() => {
     loadingTask?.destroy()
   })
-
-  function prevPage() {
-    if (pageNum > 1) pageNum -= 1
-  }
-  function nextPage() {
-    if (pageNum < numPages) pageNum += 1
-  }
-  const ZOOM_MIN = 0.25
-  const ZOOM_MAX = 3
-  function zoomOut() {
-    zoom = Math.max(ZOOM_MIN, Math.round((zoom - 0.25) * 100) / 100)
-  }
-  function zoomIn() {
-    zoom = Math.min(ZOOM_MAX, Math.round((zoom + 0.25) * 100) / 100)
-  }
-  function zoomReset() {
-    zoom = 1
-  }
 </script>
 
 <div class="pdf-viewer">
   <div class="pdf-toolbar">
     <span class="pdf-pagenav">
-      <button class="pdf-btn" onclick={prevPage} disabled={pageNum <= 1} aria-label="Previous page">‹</button>
-      <span class="pdf-page-indicator">{numPages ? `${pageNum} / ${numPages}` : '—'}</span>
-      <button class="pdf-btn" onclick={nextPage} disabled={pageNum >= numPages} aria-label="Next page">›</button>
+      <button class="pdf-btn" onclick={prevPage} disabled={currentPageNum <= 1} aria-label="Previous page">‹</button>
+      <span class="pdf-page-indicator">{numPages ? `${currentPageNum} / ${numPages}` : '—'}</span>
+      <button class="pdf-btn" onclick={nextPage} disabled={currentPageNum >= numPages} aria-label="Next page">›</button>
+    </span>
+    <span class="pdf-fit">
+      <button class="pdf-btn" class:active={fitMode === 'width'} onclick={setFitWidth} title="Fit page width to the window">Width</button>
+      <button class="pdf-btn" class:active={fitMode === 'page'} onclick={setFitPage} title="Fit whole page in the window">Page</button>
     </span>
     <span class="pdf-zoom">
       <button class="pdf-btn" onclick={zoomOut} aria-label="Zoom out">−</button>
-      <button class="pdf-btn pdf-zoom-level" onclick={zoomReset} title="Reset to 100%">{Math.round(zoom * 100)}%</button>
+      <button class="pdf-btn pdf-zoom-level" onclick={setActualSize} title="Actual size (100%)">{Math.round(zoom * 100)}%</button>
       <button class="pdf-btn" onclick={zoomIn} aria-label="Zoom in">+</button>
     </span>
   </div>
-  <div class="pdf-page-area">
+  <div class="pdf-page-area" bind:this={scrollEl}>
     {#if errorMsg}
       <div class="pdf-error">{errorMsg}</div>
     {:else if loading}
       <div class="pdf-status">Loading PDF…</div>
     {:else}
-      <canvas bind:this={canvas}></canvas>
+      {#each pages as entry (entry.num)}
+        <div
+          class="pdf-page-container"
+          use:observePage={entry.num}
+          style="width:{entry.width * zoom}px; height:{entry.height * zoom}px"
+        >
+          <canvas use:bindCanvas={entry.num}></canvas>
+        </div>
+      {/each}
     {/if}
   </div>
 </div>

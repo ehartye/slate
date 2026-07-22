@@ -185,18 +185,20 @@ body { font-family: var(--ui-font); color: var(--fg); background: var(--bg); }
 /* ── PDF viewer ─────────────────────────────────────────── */
 .pdf-viewer { display: flex; flex-direction: column; height: 100%; }
 .pdf-toolbar { display: flex; align-items: center; justify-content: space-between; flex: 0 0 auto;
-  padding: 6px 10px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); }
-.pdf-pagenav, .pdf-zoom { display: inline-flex; align-items: center; gap: 2px; }
+  padding: 6px 10px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); gap: 8px; }
+.pdf-pagenav, .pdf-zoom, .pdf-fit { display: inline-flex; align-items: center; gap: 2px; }
 .pdf-btn { background: none; border: 1px solid var(--border); color: var(--fg-muted);
   font: inherit; cursor: pointer; border-radius: 5px; padding: 1px 8px; line-height: 1.5; }
 .pdf-btn:hover { color: var(--fg); border-color: var(--accent); }
 .pdf-btn:disabled { opacity: 0.35; cursor: default; }
 .pdf-btn:disabled:hover { color: var(--fg-muted); border-color: var(--border); }
+.pdf-btn.active { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
 .pdf-zoom-level { min-width: 46px; text-align: center; border-color: transparent; }
 .pdf-page-indicator { color: var(--fg-muted); font-size: 12px; min-width: 64px; text-align: center; }
-.pdf-page-area { flex: 1; min-height: 0; overflow: auto; display: flex;
-  justify-content: center; padding: 18px; background: var(--bg); }
-.pdf-page-area canvas { box-shadow: var(--shadow); height: fit-content; }
+.pdf-page-area { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column;
+  align-items: center; gap: 18px; padding: 18px; background: var(--bg); }
+.pdf-page-container { flex: 0 0 auto; box-shadow: var(--shadow); background: var(--bg-elevated); }
+.pdf-page-container canvas { display: block; width: 100%; height: 100%; }
 .pdf-status, .pdf-error { padding: 40px 28px; color: var(--fg-muted); font-size: 14px; }
 .pdf-error { color: var(--accent); }
 
