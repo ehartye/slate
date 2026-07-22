@@ -38,6 +38,20 @@
     return lib
   }
 
+  /** Decode a `data:application/pdf;base64,...` URL into raw bytes. pdf.js's
+   *  own docs say to pass base64 data through `atob()` first and hand it a
+   *  Uint8Array via `data`, not a `data:` URL via `url` — `url` is meant for
+   *  a fetchable network location, and pdf.js's networking/range-request
+   *  layer doesn't handle a giant `data:` URL as one, surfacing (rather than
+   *  rendering) something resembling the raw payload instead. */
+  function dataUrlToBytes(dataUrl: string): Uint8Array {
+    const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1)
+    const binary = atob(base64)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    return bytes
+  }
+
   async function renderPage() {
     if (!pdfDoc || !canvas) return
     const token = renderToken
@@ -61,7 +75,7 @@
     pdfDoc = null
     try {
       const lib = await ensurePdfjs()
-      const task = lib.getDocument({ url: dataUrl })
+      const task = lib.getDocument({ data: dataUrlToBytes(dataUrl) })
       loadingTask = task
       const doc = await task.promise
       if (token !== renderToken) {
