@@ -4,7 +4,7 @@
   import {
     EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter,
   } from '@codemirror/view'
-  import { EditorState } from '@codemirror/state'
+  import { EditorState, Annotation } from '@codemirror/state'
   import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
   import { syntaxHighlighting, HighlightStyle } from '@codemirror/language'
   import { tags as t } from '@lezer/highlight'
@@ -32,6 +32,17 @@
 
   let host: HTMLDivElement
   let view: EditorView | null = null
+
+  /** Tags a dispatched transaction as a programmatic reload (external file
+   *  change or manual refresh) rather than a user edit, so the
+   *  updateListener below can tell the two apart. Without this, the reload
+   *  dispatch in the tab-switch effect is indistinguishable from typing —
+   *  CodeMirror fires the same `docChanged` update either way — which raced
+   *  with refreshWorkspace()/the file-changed handler clearing `dirty` right
+   *  before the dispatch: the listener's unconditional `dirty.set(true)`
+   *  clobbered it straight back, leaving the tab stuck showing unsaved
+   *  changes for content that in fact exactly matches disk. */
+  const reloadAnnotation = Annotation.define<boolean>()
 
   // One CodeMirror EditorState per open tab (undo history, cursor, selection —
   // everything a document needs) — swapped in via `view.setState(...)` when the
@@ -71,7 +82,8 @@
       EditorView.updateListener.of((u) => {
         if (u.docChanged) {
           content.set(u.state.doc.toString())
-          dirty.set(true)
+          const isReload = u.transactions.some((tr) => tr.annotation(reloadAnnotation))
+          if (!isReload) dirty.set(true)
         }
       }),
     ]
@@ -139,8 +151,15 @@
       }
       restoreScroll(tab?.scrollFraction ?? 0)
     } else {
-      // Same tab, external reload while it was active.
-      view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: get(content) } })
+      // Same tab, external reload while it was active. Tag the transaction
+      // (see reloadAnnotation above) and re-clear `dirty` after dispatching
+      // — belt-and-suspenders so this path always leaves the tab clean,
+      // regardless of what the caller did before bumping reloadTrigger.
+      view.dispatch({
+        changes: { from: 0, to: view.state.doc.length, insert: get(content) },
+        annotations: reloadAnnotation.of(true),
+      })
+      dirty.set(false)
       editorStates.set(id, view.state)
     }
   })
