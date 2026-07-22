@@ -29,6 +29,11 @@ export const resolveMdLink = (base: string, href: string) =>
 export const resolveImageDataUrl = (base: string, href: string) =>
   invoke<string | null>('resolve_image_data_url', { base, href })
 
+/** Read a PDF file's bytes as a `data:application/pdf;base64,...` URL, for
+ *  PdfViewer.svelte's bundled PDF.js to load. */
+export const readPdfAsDataUrl = (path: string) =>
+  invoke<string>('read_pdf_as_data_url', { path })
+
 /** File name from a full path (handles \\ and /). */
 export const baseName = (path: string) => path.split(/[\\/]/).pop() ?? path
 

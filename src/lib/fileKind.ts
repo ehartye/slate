@@ -1,8 +1,9 @@
 // Helpers for the "Markdown only" toggle: telling markdown files apart from
-// other text files, and rendering the latter in the Preview pane.
+// other text files (and PDFs), and rendering the former in the Preview pane.
 import { renderMarkdown } from './markdown'
 
 const MD_EXTENSIONS = new Set(['md', 'markdown'])
+const PDF_EXTENSIONS = new Set(['pdf'])
 
 /** The lowercased extension of `path` (no dot), or '' if it has none. */
 export function extensionOf(path: string): string {
@@ -13,6 +14,12 @@ export function extensionOf(path: string): string {
 /** Whether `path` is a `.md`/`.markdown` file. */
 export function isMarkdownPath(path: string | null): boolean {
   return !!path && MD_EXTENSIONS.has(extensionOf(path))
+}
+
+/** Whether `path` is a `.pdf` file — a binary format, handled by its own
+ *  viewer (PdfViewer.svelte) rather than CodeMirror/the markdown pipeline. */
+export function isPdfPath(path: string | null): boolean {
+  return !!path && PDF_EXTENSIONS.has(extensionOf(path))
 }
 
 /** A fence of backticks long enough to not be broken out of by any backtick

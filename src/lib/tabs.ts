@@ -3,12 +3,21 @@
 // Editor.svelte (the only place that needs it), and swapped in via
 // `view.setState(...)` when `activeTabId` changes — the idiomatic CodeMirror 6
 // pattern for one editor view backing several open documents.
+//
+// PDF tabs are a separate case (a PDF isn't text, so there's no CodeMirror
+// doc at all): their rendered content lives in the `pdfDataUrl` store instead
+// of `content`, backed by `pdfCache` below — a per-tab cache kept here rather
+// than in PdfViewer.svelte, since (unlike Editor.svelte, which stays mounted
+// for the whole session) PdfViewer only mounts while a PDF tab is active, so
+// a component-local cache would be lost every time the user tabs away from
+// all PDFs and back.
 import { get } from 'svelte/store'
 import {
   tabs, activeTabId, currentFile, content, dirty, editorScroll, reloadTrigger, statusMsg,
-  type Tab,
+  pdfDataUrl, type Tab,
 } from './stores'
-import { readFile } from './tauri'
+import { readFile, readPdfAsDataUrl } from './tauri'
+import { isPdfPath } from './fileKind'
 
 let counter = 0
 /** A unique-enough id for the lifetime of the app; tabs aren't persisted. */
@@ -16,6 +25,8 @@ function nextTabId(): string {
   counter += 1
   return `tab-${counter}`
 }
+
+const pdfCache = new Map<string, string>() // tab id -> data: URL
 
 /** The currently open tab with this path, if any. */
 export function findTabByPath(path: string): Tab | undefined {
@@ -44,6 +55,28 @@ export async function openTab(path: string): Promise<void> {
     await switchToTab(existing.id)
     return
   }
+
+  const tab: Tab = { id: nextTabId(), path, dirty: false, scrollFraction: 0, needsReload: false }
+
+  if (isPdfPath(path)) {
+    let dataUrl: string
+    try {
+      dataUrl = await readPdfAsDataUrl(path)
+    } catch (e) {
+      statusMsg.set(`Could not open file: ${e}`)
+      return
+    }
+    captureActiveTabState()
+    pdfCache.set(tab.id, dataUrl)
+    tabs.update((ts) => [...ts, tab])
+    activeTabId.set(tab.id)
+    currentFile.set(path)
+    content.set('')
+    dirty.set(false)
+    pdfDataUrl.set(dataUrl)
+    return
+  }
+
   let text: string
   try {
     text = await readFile(path)
@@ -52,13 +85,13 @@ export async function openTab(path: string): Promise<void> {
     return
   }
   captureActiveTabState()
-  const tab: Tab = { id: nextTabId(), path, dirty: false, scrollFraction: 0, needsReload: false }
   tabs.update((ts) => [...ts, tab])
   activeTabId.set(tab.id)
   currentFile.set(path)
   content.set(text)
   dirty.set(false)
   editorScroll.set(0)
+  pdfDataUrl.set(null)
 }
 
 /** Switch to an already-open tab by id. Restores its dirty/scroll snapshot;
@@ -72,8 +105,29 @@ export async function switchToTab(id: string): Promise<void> {
   activeTabId.set(id)
   currentFile.set(target.path)
   dirty.set(target.dirty)
-  editorScroll.set(target.scrollFraction)
 
+  if (isPdfPath(target.path)) {
+    const cached = pdfCache.get(id)
+    if (!target.needsReload && cached) {
+      pdfDataUrl.set(cached)
+      return
+    }
+    try {
+      const dataUrl = await readPdfAsDataUrl(target.path)
+      pdfCache.set(id, dataUrl)
+      pdfDataUrl.set(dataUrl)
+      if (target.needsReload) {
+        tabs.update((ts) => ts.map((t) => (t.id === id ? { ...t, needsReload: false } : t)))
+        statusMsg.set('Reloaded from disk')
+      }
+    } catch (e) {
+      statusMsg.set(`Could not reload: ${e}`)
+    }
+    return
+  }
+
+  pdfDataUrl.set(null)
+  editorScroll.set(target.scrollFraction)
   if (target.needsReload) {
     if (target.dirty) {
       statusMsg.set('File changed on disk — save or discard changes to reload')
@@ -100,6 +154,7 @@ export async function closeTab(id: string): Promise<void> {
   if (idx === -1) return
   const remaining = current.filter((t) => t.id !== id)
   tabs.set(remaining)
+  pdfCache.delete(id)
 
   if (get(activeTabId) !== id) return // closed a background tab — active tab unaffected
 
@@ -109,6 +164,7 @@ export async function closeTab(id: string): Promise<void> {
     content.set('')
     dirty.set(false)
     editorScroll.set(0)
+    pdfDataUrl.set(null)
     return
   }
   const next = current[idx + 1] ?? current[idx - 1]

@@ -19,12 +19,19 @@ export const tabs = writable<Tab[]>([])
 export const activeTabId = writable<string | null>(null)
 
 export const currentFile = writable<string | null>(null)
-export const content = writable<string>('')           // editor text
+export const content = writable<string>('')           // editor text (empty/inert for pdf tabs)
 export const dirty = writable<boolean>(false)
 export const reloadTrigger = writable<number>(0)  // bumped on external file reload
 export const statusMsg = writable<string>('')         // transient errors/info
 export const editorScroll = writable<number>(0)       // 0..1 scroll fraction, for preview sync
 export const previewZoom = writable<number>(1)        // preview render scale, persisted
+
+/** The active tab's PDF content as a `data:` URL, or null when the active
+ *  tab isn't a PDF. Kept separate from `content` (which stays pure "raw text
+ *  of a text-based tab") so nothing that reads `content` — Preview's
+ *  markdown pipeline, Save — ever has to guard against it holding a large
+ *  base64 blob. See tabs.ts for the per-tab data-url cache. */
+export const pdfDataUrl = writable<string | null>(null)
 
 // File-browser filters, persisted
 export const mdOnlyMode = writable<boolean>(true)      // false: browse any text file, not just .md

@@ -34,12 +34,12 @@ The app is two layers talking over Tauri's `invoke`/`emit` bridge.
 ### Rust shell (`src-tauri/src/`) — thin I/O layer
 
 - `lib.rs` — the real entry point (`run()`); `main.rs` just calls it. Registers all `#[tauri::command]`s in `invoke_handler!`, manages two pieces of state (`OpenedFile`, `FileWatcher`), and seeds themes on `setup`.
-- `files.rs` — pure, unit-tested helpers: markdown file listing, relative `.md` link resolution (with Windows `\\?\` verbatim-prefix stripping), and parsing theme CSS headers (`@name`, `@mode`, `--accent`, `--bg`).
+- `files.rs` — pure, unit-tested helpers: markdown file listing, PDF file listing (`pdf_files_in`/`is_pdf`, alongside the general-text-file listing used by "Markdown only" mode off), relative `.md` link resolution (with Windows `\\?\` verbatim-prefix stripping), and parsing theme CSS headers (`@name`, `@mode`, `--accent`, `--bg`).
 - `win_icon.rs` — Windows-specific window icon handling.
 
-Commands exposed to the frontend (see `src/lib/tauri.ts` and `theme.ts` for the typed wrappers): `list_markdown_files`, `read_file`, `write_file`, `watch_file`/`unwatch_file`, `get_startup_file`, `list_themes`, `open_in_browser`, `set_window_icon`.
+Commands exposed to the frontend (see `src/lib/tauri.ts` and `theme.ts` for the typed wrappers): `list_markdown_files`, `list_text_files`, `read_file`, `read_pdf_as_data_url`, `write_file`, `watch_file`/`unwatch_file`, `get_startup_file`, `list_themes`, `open_in_browser`, `set_window_icon`.
 
-**File-open associations** are handled differently per OS and this is easy to break: Windows delivers the launch file as a CLI arg (read in `get_startup_file`); macOS delivers it via Apple Events (`RunEvent::Opened` in `run()`'s callback) into `OpenedFile` state and/or an `open-file` event. The frontend reconciles both in `+page.svelte`'s `onMount`.
+**File-open associations** are handled differently per OS and this is easy to break: Windows delivers the launch file as a CLI arg (read in `get_startup_file`); macOS delivers it via Apple Events (`RunEvent::Opened` in `run()`'s callback) into `OpenedFile` state and/or an `open-file` event. The frontend reconciles both in `+page.svelte`'s `onMount`. `get_startup_file` only recognizes `.md`/`.markdown` — PDFs are openable from within the app (sidebar/"Open file" dialog) but deliberately aren't wired into OS-level file-association/CLI-arg launch handling; that's a separate decision (becoming a registered PDF handler is a bigger commitment than an in-app viewer) rather than an oversight.
 
 **External-change watching:** `watch_file` debounces filesystem events on the file's *parent dir* (to catch atomic-rename saves) and emits `file-changed`. The frontend's own saves set a `suppressNextChange` flag so the app doesn't treat its own write as an external edit. If the buffer is dirty, an external change shows a warning instead of clobbering edits.
 
@@ -52,6 +52,7 @@ Svelte 5 (runes: `$state`, `$effect`, `$derived`), SPA mode via `adapter-static`
 - `lib/components/Preview.svelte` — debounced (120ms) markdown render, mermaid rendering pass, and link interception (in-page anchors scroll, http/mailto open in system browser, relative `.md` links resolve via `resolve_md_link` and load in-app).
 - `lib/markdown.ts` — the single `markdown-it` instance with all plugins (task lists, footnotes, anchors+TOC, mark/sup/sub/kbd, GitHub alerts, KaTeX) plus highlight.js fence highlighting and front-matter → metadata-card rendering. Mermaid fences are emitted as `<pre class="mermaid">` for Preview to render.
 - `lib/theme.ts` / `lib/export.ts` / `lib/zoom.ts` / `lib/icon.ts` — theme apply/persist, standalone-HTML export for "Open in browser", preview zoom (persisted), and dynamic app-icon generation from the theme.
+- `lib/components/PdfViewer.svelte` — PDF tab rendering, via a dynamically-imported `pdfjs-dist` (Vite code-splits it into its own chunk, so its cost is paid only when a PDF tab is actually opened). Canvas-based single-page render with its own page-nav/zoom toolbar. A PDF isn't text, so PDF tabs skip CodeMirror/Editor.svelte entirely: `+page.svelte` hides the whole Editor pane and rail when the active tab is a PDF (`isPdfPath($currentFile)`) and shows `PdfViewer` full-width in the preview pane instead of `Preview`. Content flows through a dedicated `pdfDataUrl` store (a `data:` URL from the `read_pdf_as_data_url` command) and a `pdfCache` map in `tabs.ts`, kept separate from `content`/the text-tab cache so nothing that reads `content` (Preview's markdown pipeline, Save, "Open in browser") ever has to guard against it holding a large base64 blob.
 
 ### The theme system (core feature)
 

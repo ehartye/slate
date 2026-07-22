@@ -3,18 +3,20 @@ import { get } from 'svelte/store'
 
 vi.mock('../src/lib/tauri', async (importOriginal) => {
   const orig = await importOriginal<typeof import('../src/lib/tauri')>()
-  return { ...orig, readFile: vi.fn() }
+  return { ...orig, readFile: vi.fn(), readPdfAsDataUrl: vi.fn() }
 })
 
 import {
   openTab, switchToTab, closeTab, findTabByPath, markBackgroundTabForReload, cycleTab,
 } from '../src/lib/tabs'
-import { readFile } from '../src/lib/tauri'
+import { readFile, readPdfAsDataUrl } from '../src/lib/tauri'
 import {
   tabs, activeTabId, currentFile, content, dirty, editorScroll, reloadTrigger, statusMsg,
+  pdfDataUrl,
 } from '../src/lib/stores'
 
 const mockRead = vi.mocked(readFile)
+const mockReadPdf = vi.mocked(readPdfAsDataUrl)
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -26,6 +28,7 @@ beforeEach(() => {
   editorScroll.set(0)
   reloadTrigger.set(0)
   statusMsg.set('')
+  pdfDataUrl.set(null)
 })
 
 describe('openTab', () => {
@@ -252,5 +255,109 @@ describe('cycleTab', () => {
     await cycleTab(1)
 
     expect(get(currentFile)).toBe('/a.md')
+  })
+})
+
+describe('PDF tabs', () => {
+  it('opens a pdf via readPdfAsDataUrl, not readFile, and leaves content empty', async () => {
+    mockReadPdf.mockResolvedValue('data:application/pdf;base64,AAA')
+
+    await openTab('/report.pdf')
+
+    expect(mockReadPdf).toHaveBeenCalledWith('/report.pdf')
+    expect(mockRead).not.toHaveBeenCalled()
+    expect(get(currentFile)).toBe('/report.pdf')
+    expect(get(content)).toBe('')
+    expect(get(dirty)).toBe(false)
+    expect(get(pdfDataUrl)).toBe('data:application/pdf;base64,AAA')
+  })
+
+  it('reports a read failure via statusMsg without creating a tab', async () => {
+    mockReadPdf.mockRejectedValue('boom')
+
+    await openTab('/broken.pdf')
+
+    expect(get(tabs).length).toBe(0)
+    expect(get(statusMsg)).toContain('Could not open file')
+  })
+
+  it('clears pdfDataUrl when opening a text tab after a pdf tab', async () => {
+    mockReadPdf.mockResolvedValue('data:application/pdf;base64,AAA')
+    await openTab('/report.pdf')
+    expect(get(pdfDataUrl)).not.toBeNull()
+
+    mockRead.mockResolvedValue('# hello')
+    await openTab('/notes.md')
+
+    expect(get(pdfDataUrl)).toBeNull()
+  })
+
+  it('sets pdfDataUrl (and clears it for text) when switching tabs back and forth', async () => {
+    mockRead.mockResolvedValue('# hello')
+    mockReadPdf.mockResolvedValue('data:application/pdf;base64,AAA')
+    await openTab('/notes.md')
+    await openTab('/report.pdf') // active
+
+    const notesTab = get(tabs).find((t) => t.path === '/notes.md')!
+    await switchToTab(notesTab.id)
+    // content for a plain revisit is reconciled by Editor.svelte from its own
+    // cached EditorState, not by tabs.ts (same nuance as the plain-tab tests
+    // above) — what tabs.ts itself guarantees is that pdfDataUrl is cleared.
+    expect(get(pdfDataUrl)).toBeNull()
+
+    const pdfTab = get(tabs).find((t) => t.path === '/report.pdf')!
+    await switchToTab(pdfTab.id)
+    expect(get(pdfDataUrl)).toBe('data:application/pdf;base64,AAA')
+  })
+
+  it('does not re-fetch a cached pdf on a plain (non-reload) tab switch', async () => {
+    mockReadPdf.mockResolvedValue('data:application/pdf;base64,AAA')
+    mockRead.mockResolvedValue('# hello')
+    await openTab('/report.pdf')
+    await openTab('/notes.md') // active, pdf now a background tab
+    mockReadPdf.mockClear()
+
+    const pdfTab = get(tabs).find((t) => t.path === '/report.pdf')!
+    await switchToTab(pdfTab.id)
+
+    expect(mockReadPdf).not.toHaveBeenCalled()
+    expect(get(pdfDataUrl)).toBe('data:application/pdf;base64,AAA')
+  })
+
+  it('re-fetches and clears needsReload when switching into a pdf tab flagged for reload', async () => {
+    mockReadPdf.mockResolvedValue('data:application/pdf;base64,OLD')
+    mockRead.mockResolvedValue('# hello')
+    await openTab('/report.pdf')
+    await openTab('/notes.md') // active, pdf now a background tab
+    markBackgroundTabForReload('/report.pdf')
+    mockReadPdf.mockResolvedValue('data:application/pdf;base64,NEW')
+
+    const pdfTab = get(tabs).find((t) => t.path === '/report.pdf')!
+    await switchToTab(pdfTab.id)
+
+    expect(get(pdfDataUrl)).toBe('data:application/pdf;base64,NEW')
+    expect(get(tabs).find((t) => t.id === pdfTab.id)?.needsReload).toBe(false)
+    expect(get(statusMsg)).toContain('Reloaded from disk')
+  })
+
+  it('never calls readFile for a pdf path (would error on binary content)', async () => {
+    mockReadPdf.mockResolvedValue('data:application/pdf;base64,AAA')
+    mockRead.mockResolvedValue('# hello')
+    await openTab('/notes.md')
+    await openTab('/report.pdf')
+    await switchToTab(get(tabs).find((t) => t.path === '/notes.md')!.id)
+    await switchToTab(get(tabs).find((t) => t.path === '/report.pdf')!.id)
+
+    expect(mockRead).not.toHaveBeenCalledWith('/report.pdf')
+  })
+
+  it('clears pdfDataUrl and evicts the cache entry when closing the only (pdf) tab', async () => {
+    mockReadPdf.mockResolvedValue('data:application/pdf;base64,AAA')
+    await openTab('/report.pdf')
+
+    await closeTab(get(activeTabId)!)
+
+    expect(get(tabs)).toEqual([])
+    expect(get(pdfDataUrl)).toBeNull()
   })
 })

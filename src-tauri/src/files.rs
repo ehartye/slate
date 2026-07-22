@@ -105,6 +105,24 @@ pub const TEXT_EXTENSIONS: &[&str] = &[
 /// `image_mime` below — every extension here must have a mapped MIME type.
 pub const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "ico"];
 
+/// PDF — a binary format, so unlike `TEXT_EXTENSIONS` it never goes through
+/// `read_file`; see `read_pdf_as_data_url` in `lib.rs` (mirrors how images
+/// are read via `resolve_image_data_url`, not `read_file`).
+pub const PDF_EXTENSIONS: &[&str] = &["pdf"];
+
+/// Whether `path` has a recognized PDF extension.
+pub fn is_pdf(path: &Path) -> bool {
+    has_extension(path, PDF_EXTENSIONS)
+}
+
+/// Return absolute paths of PDF files directly in `dir`, sorted by file name
+/// — listed alongside `text_files_in` when Markdown-only mode is off (PDF is
+/// part of the same "non-markdown" browsing surface, just not text). Dotfiles
+/// are skipped unless `show_hidden` is set.
+pub fn pdf_files_in(dir: &Path, show_hidden: bool) -> std::io::Result<Vec<PathBuf>> {
+    files_with_extensions_in(dir, PDF_EXTENSIONS, show_hidden)
+}
+
 /// Resolve a relative link `href` (from a markdown file at `base_file`) to an
 /// absolute path, but only if it points at an existing `.md`/`.markdown` file.
 /// Returns `None` for missing files, non-markdown targets, or absolute/URL hrefs.
@@ -289,6 +307,38 @@ mod tests {
 
         let with_hidden = text_files_in(dir.path(), true).unwrap();
         assert_eq!(with_hidden.len(), 5);
+    }
+
+    #[test]
+    fn lists_pdf_files_sorted_separately_from_text() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("report.PDF"), "x").unwrap();
+        fs::write(dir.path().join("appendix.pdf"), "x").unwrap();
+        fs::write(dir.path().join("notes.md"), "x").unwrap();
+        fs::write(dir.path().join(".hidden.pdf"), "x").unwrap();
+
+        let pdfs = pdf_files_in(dir.path(), false).unwrap();
+        let names: Vec<String> = pdfs
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+        assert_eq!(names, vec!["appendix.pdf", "report.PDF"]);
+
+        // text_files_in doesn't pick up pdfs — they're listed separately and
+        // merged by the caller (list_text_files in lib.rs).
+        let text = text_files_in(dir.path(), false).unwrap();
+        assert!(text.iter().all(|p| !is_pdf(p)));
+
+        let with_hidden = pdf_files_in(dir.path(), true).unwrap();
+        assert_eq!(with_hidden.len(), 3);
+    }
+
+    #[test]
+    fn is_pdf_checks_extension_case_insensitively() {
+        assert!(is_pdf(Path::new("a.pdf")));
+        assert!(is_pdf(Path::new("A.PDF")));
+        assert!(!is_pdf(Path::new("a.md")));
+        assert!(!is_pdf(Path::new("a")));
     }
 
     #[test]
