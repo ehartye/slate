@@ -35,8 +35,15 @@
 .preview hr { border: 0; border-top: 1px solid var(--border); margin: 2em 0; }
 .preview ul, .preview ol { padding-left: 1.4em; }
 .preview li { margin: 0.3em 0; }
-.preview table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 0.95em; }
-.preview th, .preview td { border: 1px solid var(--border); padding: 7px 11px; text-align: left; }
+/* table-layout: fixed + overflow-wrap together are both required to keep a
+   table within the page width when printed: fixed layout stops the table's
+   own box from growing past its 100% width to fit long content, and
+   overflow-wrap lets an unbreakable long token (a URL, a command, ...)
+   wrap inside its cell instead of visually overflowing it — confirmed
+   empirically (via a headless-browser print-media measurement) that either
+   alone still overflows the page, only the combination doesn't. */
+.preview table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 0.95em; table-layout: fixed; }
+.preview th, .preview td { border: 1px solid var(--border); padding: 7px 11px; text-align: left; overflow-wrap: break-word; }
 .preview th { background: var(--accent-soft); font-family: var(--prose-heading-font); }
 .preview img { max-width: 100%; border-radius: 8px; }
 .preview input[type=checkbox] { margin-right: 0.5em; }
