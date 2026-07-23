@@ -222,6 +222,17 @@
         // state object — so it must be allowed to resolve again here.
         languageResolvedFor.delete(id)
       }
+      // `view.setState()` (below) does NOT fire the updateListener the way a
+      // real dispatch does, so `content` is never otherwise touched by a
+      // switch to an already-cached tab — it would just keep holding
+      // whichever tab's text was last typed into or freshly loaded. That
+      // silently stale `content` is what Preview, Toolbar's "Open in
+      // browser", and — worst of all — save() all read from, so left
+      // unfixed this doesn't just mis-render the preview, it can write one
+      // tab's text into a completely different tab's file on disk. Always
+      // resync it to whatever this tab's *actual* document is before
+      // switching the view to it.
+      content.set(state.doc.toString())
       view.setState(state)
       if (forceFresh) {
         tabs.update((ts) => ts.map((t) => (t.id === id ? { ...t, needsReload: false } : t)))
