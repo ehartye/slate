@@ -30,6 +30,16 @@
 .preview pre.hljs, .preview pre code { background: none; padding: 0; }
 .preview pre code { font-size: 0.86em; }
 .preview pre.mermaid { background: none; border: 0; text-align: center; }
+/* On screen, a wide code block scrolls horizontally (overflow: auto above) —
+   normal, expected code-block UX. There's no scrollbar on a printed page
+   though, so without this a long line just gets silently clipped at the
+   page edge instead: confirmed empirically (headless-browser print-media
+   measurement) that overflow: auto's box doesn't grow to show the rest of
+   the line when printed, it just cuts it off. Print-only, so on-screen
+   behavior is unchanged. */
+@media print {
+  .preview pre { overflow: visible; white-space: pre-wrap; overflow-wrap: break-word; }
+}
 .preview blockquote { margin: 1em 0; padding: 0.4em 1em; border-left: 3px solid var(--accent);
   color: var(--fg-muted); background: var(--accent-soft); border-radius: 0 8px 8px 0; }
 .preview hr { border: 0; border-top: 1px solid var(--border); margin: 2em 0; }
