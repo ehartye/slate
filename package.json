@@ -34,6 +34,7 @@
     "@tauri-apps/plugin-opener": "^2",
     "@vscode/markdown-it-katex": "^1.1.2",
     "codemirror": "^6.0.2",
+    "dompurify": "^3.4.12",
     "highlight.js": "^11.11.1",
     "katex": "^0.17.0",
     "markdown-it": "^14.2.0",

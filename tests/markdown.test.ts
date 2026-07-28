@@ -97,3 +97,91 @@ describe('renderMarkdown front matter', () => {
     expect(out).not.toContain('front-matter')
   })
 })
+
+describe('renderMarkdown inline HTML', () => {
+  it('renders block-level raw HTML instead of escaping it', () => {
+    const out = renderMarkdown('<div class="note"><p>Hi</p></div>')
+    expect(out).toContain('<div class="note">')
+    expect(out).not.toContain('&lt;div')
+  })
+
+  it('renders inline raw HTML inside a paragraph', () => {
+    const out = renderMarkdown('Press <kbd>Esc</kbd> to go <em>back</em>.')
+    expect(out).toContain('<kbd>Esc</kbd>')
+    expect(out).toContain('<em>back</em>')
+  })
+
+  it('renders collapsible <details> blocks', () => {
+    const out = renderMarkdown('<details>\n<summary>More</summary>\n\nBody text\n\n</details>')
+    expect(out).toContain('<details>')
+    expect(out).toContain('<summary>More</summary>')
+  })
+
+  it('keeps markdown working inside raw HTML blocks separated by blank lines', () => {
+    const out = renderMarkdown('<div align="center">\n\n**bold**\n\n</div>')
+    expect(out).toContain('<div align="center">')
+    expect(out).toContain('<strong>bold</strong>')
+  })
+
+  it('keeps style attributes and inline <img> tags', () => {
+    const out = renderMarkdown('<p style="color: red">red</p>\n<img src="a.png" alt="a" width="20">')
+    expect(out).toContain('style="color: red"')
+    expect(out).toContain('src="a.png"')
+  })
+
+  it('still escapes HTML inside fenced code blocks', () => {
+    const out = renderMarkdown('```plaintext\n<div>literal</div>\n```')
+    expect(out).toContain('&lt;div&gt;literal&lt;/div&gt;')
+    expect(out).not.toContain('<div>literal')
+  })
+
+  it('keeps heading ids for anchors whose slug collides with a document property', () => {
+    expect(renderMarkdown('# Location')).toMatch(/<h1[^>]*id="location"/)
+    expect(renderMarkdown('# Images')).toMatch(/<h1[^>]*id="images"/)
+  })
+})
+
+describe('renderMarkdown sanitization', () => {
+  it('strips <script> tags from raw HTML', () => {
+    const out = renderMarkdown('before\n\n<script>alert(1)</script>\n\nafter')
+    expect(out).not.toContain('<script')
+    expect(out).toContain('before')
+    expect(out).toContain('after')
+  })
+
+  it('strips inline event handlers', () => {
+    const out = renderMarkdown('<img src="x" onerror="alert(1)">')
+    expect(out).not.toContain('onerror')
+  })
+
+  it('strips javascript: URLs from links', () => {
+    const out = renderMarkdown('<a href="javascript:alert(1)">click</a>')
+    expect(out).not.toContain('javascript:')
+    expect(out).toContain('click')
+  })
+
+  it('strips iframes and other remote-content embeds', () => {
+    const out = renderMarkdown('<iframe src="https://evil.example"></iframe>\n\n<object data="x"></object>')
+    expect(out).not.toContain('<iframe')
+    expect(out).not.toContain('<object')
+  })
+
+  it('leaves KaTeX math markup intact', () => {
+    const out = renderMarkdown('$E=mc^2$')
+    expect(out).toContain('class="katex"')
+    expect(out).toContain('<math')
+  })
+
+  it('leaves mermaid fences intact for client-side rendering', () => {
+    const out = renderMarkdown('```mermaid\ngraph LR; A-->B\n```')
+    expect(out).toContain('<pre class="mermaid">')
+    expect(out).toContain('graph LR')
+  })
+
+  it('leaves task-list checkboxes and footnote links intact', () => {
+    expect(renderMarkdown('- [x] done')).toContain('type="checkbox"')
+    const fn = renderMarkdown('Text[^1]\n\n[^1]: The note.')
+    expect(fn).toContain('href="#fn1"')
+    expect(fn).toContain('id="fn1"')
+  })
+})
