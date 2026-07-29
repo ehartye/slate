@@ -73,7 +73,10 @@
   // passed via `?open=` when this window was spawned to open a specific file
   // (macOS hot file-open, or a future "open in new window" action).
   // Also listen for files opened while the app is already running (macOS Finder).
-  onMount(async () => {
+  // `register` collects unlisten handles so the caller can tear them down; this
+  // is a plain async function rather than an async `onMount` callback because
+  // Svelte ignores a cleanup function returned from an async lifecycle hook.
+  async function initFileOpen(register: (unlisten: () => void) => void) {
     const openParam = new URLSearchParams(window.location.search).get('open')
     let startup: string | null = null
     if (openParam) {
@@ -87,9 +90,9 @@
     }
     if (startup) await loadFile(startup)
 
-    const unlisten = await listen<string>('open-file', (event) => loadFile(event.payload))
+    register(await listen<string>('open-file', (event) => loadFile(event.payload)))
 
-    const unlistenChanged = await listen<string>('file-changed', async (event) => {
+    register(await listen<string>('file-changed', async (event) => {
       const path = event.payload
       if (suppressNextChangeFor.delete(path)) return
 
@@ -113,9 +116,26 @@
       } catch (e) {
         statusMsg.set(`Could not reload: ${e}`)
       }
-    })
+    }))
+  }
 
-    return () => { unlisten(); unlistenChanged() }
+  onMount(() => {
+    let disposed = false
+    const cleanups: Array<() => void> = []
+    // A listener that resolves after unmount is torn down immediately rather
+    // than being added to a list nobody will drain.
+    const register = (unlisten: () => void) => {
+      if (disposed) unlisten()
+      else cleanups.push(unlisten)
+    }
+
+    initFileOpen(register).catch((e) => statusMsg.set(`Could not open file: ${e}`))
+
+    return () => {
+      disposed = true
+      for (const unlisten of cleanups) unlisten()
+      cleanups.length = 0
+    }
   })
 
   function startDrag(e: MouseEvent) {

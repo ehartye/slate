@@ -10,6 +10,7 @@ import kbd from 'markdown-it-kbd'
 import githubAlerts from 'markdown-it-github-alerts'
 import hljs from 'highlight.js'
 import katex from '@vscode/markdown-it-katex'
+import DOMPurify from 'dompurify'
 
 // Fences whose language highlight.js has no grammar for, mapped to the closest
 // supported one. Apex is Salesforce's Java-shaped language — java highlights it well.
@@ -18,7 +19,12 @@ const LANG_ALIASES: Record<string, string> = {
 }
 
 const md: MarkdownIt = new MarkdownIt({
-  html: false,
+  // Raw HTML in a document is passed through and rendered rather than escaped,
+  // so `<details>`, `<sub>`, layout `<div>`s etc. work the way they do on
+  // GitHub. Everything is run through DOMPurify before it reaches the DOM
+  // (see `renderMarkdown`) — a markdown file is untrusted input, and the
+  // "Open in browser" export has no CSP to fall back on.
+  html: true,
   linkify: true,
   breaks: false,
   highlight: (code, lang) => {
@@ -93,6 +99,33 @@ function renderFrontMatter(yaml: string): string {
   return `<div class="front-matter">${cells}</div>`
 }
 
+/**
+ * Strip anything script-executing from rendered HTML while leaving the markup
+ * authors actually want (layout tags, `style`, `<details>`, KaTeX's MathML,
+ * highlight.js spans). Applied to the whole rendered document because `html:
+ * true` lets a source file inject arbitrary markup.
+ */
+function sanitize(html: string): string {
+  return DOMPurify.sanitize(html, {
+    // KaTeX emits MathML and mermaid/SVG markup can appear inline.
+    USE_PROFILES: { html: true, svg: true, svgFilters: true, mathMl: true },
+    // `target="_blank"` on author-written anchors, and the `align` attributes
+    // GitHub-flavored raw HTML tables commonly use.
+    ADD_ATTR: ['target', 'align'],
+    // Frames can't render under the app's `default-src 'self'` CSP anyway, and
+    // allowing them in the browser export would smuggle remote script back in.
+    FORBID_TAGS: ['iframe', 'frame', 'frameset', 'object', 'embed', 'base'],
+    // DOMPurify's clobbering guard drops any `id` whose value happens to be a
+    // `document` property — which silently kills heading anchors and TOC links
+    // for ordinary headings like "Title", "Location", or "Images". The guard
+    // only matters for code doing named `document.<x>` lookups; this app uses
+    // `document.getElementById`/`querySelector`, which named access can't
+    // shadow. Script execution is blocked by the tag/attribute allowlist above,
+    // independently of this setting.
+    SANITIZE_DOM: false,
+  })
+}
+
 export function renderMarkdown(src: string): string {
   let card = ''
   const m = src.match(FRONT_MATTER)
@@ -100,5 +133,5 @@ export function renderMarkdown(src: string): string {
     card = renderFrontMatter(m[1])
     src = src.slice(m[0].length)
   }
-  return card + md.render(src)
+  return sanitize(card + md.render(src))
 }
