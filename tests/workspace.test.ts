@@ -13,7 +13,7 @@ import { loadFile, refreshWorkspace, browseFolder, folderUp, relistCurrentFolder
 import { listMarkdownFiles, listTextFiles, listSubfolders, readFile } from '../src/lib/tauri'
 import {
   content, currentFile, currentFolder, files, folders, dirty, statusMsg, reloadTrigger,
-  mdOnlyMode, showHiddenFiles, tabs, activeTabId,
+  mdOnlyMode, showHiddenFiles, tabs, activeTabId, setTabText,
 } from '../src/lib/stores'
 
 const mockList = vi.mocked(listMarkdownFiles)
@@ -21,11 +21,21 @@ const mockTextList = vi.mocked(listTextFiles)
 const mockSubfolders = vi.mocked(listSubfolders)
 const mockRead = vi.mocked(readFile)
 
+/** Put the app into the state it's actually in when a file is open: a tab
+ *  whose document is what `content` is a view of. Setting `currentFile` and
+ *  `content` directly no longer models anything reachable — `content` only
+ *  ever reflects the active tab's document. */
+function openFakeTab(path: string, text: string, id = 'tab-fake'): void {
+  tabs.set([{ id, path, dirty: false, scrollFraction: 0, needsReload: false }])
+  activeTabId.set(id)
+  currentFile.set(path)
+  setTabText(id, text)
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   mockSubfolders.mockResolvedValue([])
   mockTextList.mockResolvedValue([])
-  content.set('')
   currentFile.set(null)
   currentFolder.set(null)
   files.set([])
@@ -35,7 +45,7 @@ beforeEach(() => {
   reloadTrigger.set(0)
   mdOnlyMode.set(true)
   showHiddenFiles.set(false)
-  tabs.set([])
+  tabs.set([]) // also empties `content` — it's a view of the active tab
   activeTabId.set(null)
 })
 
@@ -70,8 +80,7 @@ describe('loadFile', () => {
 describe('refreshWorkspace', () => {
   it('re-lists the folder and reloads the open file, discarding edits', async () => {
     currentFolder.set('C:\\docs')
-    currentFile.set('C:\\docs\\a.md')
-    content.set('unsaved edits')
+    openFakeTab('C:\\docs\\a.md', 'unsaved edits')
     dirty.set(true)
     mockList.mockResolvedValue(['C:\\docs\\a.md', 'C:\\docs\\new.md'])
     mockRead.mockResolvedValue('from disk')
@@ -104,8 +113,7 @@ describe('refreshWorkspace', () => {
 
 describe('browseFolder', () => {
   it('navigates into a folder and lists its files/subfolders without touching the open file', async () => {
-    currentFile.set('C:\\docs\\open.md')
-    content.set('unchanged')
+    openFakeTab('C:\\docs\\open.md', 'unchanged')
     mockList.mockResolvedValue(['C:\\docs\\sub\\a.md'])
     mockSubfolders.mockResolvedValue(['C:\\docs\\sub\\deeper'])
 

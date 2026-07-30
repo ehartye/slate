@@ -20,15 +20,15 @@ const mockReadPdf = vi.mocked(readPdfAsDataUrl)
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // `content`/`pdfDataUrl` are views of the active tab's document (stores.ts),
+  // so clearing the tabs is what resets them — they have no `set` of their own.
   tabs.set([])
   activeTabId.set(null)
   currentFile.set(null)
-  content.set('')
   dirty.set(false)
   editorScroll.set(0)
   reloadTrigger.set(0)
   statusMsg.set('')
-  pdfDataUrl.set(null)
 })
 
 describe('openTab', () => {
@@ -404,5 +404,54 @@ describe('PDF tabs', () => {
 
     expect(get(tabs)).toEqual([])
     expect(get(pdfDataUrl)).toBeNull()
+  })
+})
+
+// `content` and `pdfDataUrl` are views of the *active* tab's document rather
+// than free-floating buffers (see stores.ts). These pin down the properties
+// that arrangement exists to guarantee — the ones that made a whole class of
+// "the store is showing some other tab's document" bug possible before, up to
+// and including save() writing one tab's text into another tab's file.
+describe('content is scoped to the active tab', () => {
+  it('routes an edit to the active tab, leaving background tabs untouched', async () => {
+    mockRead.mockResolvedValueOnce('one').mockResolvedValueOnce('two')
+    await openTab('/a.md')
+    await openTab('/b.md')
+
+    content.set('two edited')
+
+    const tabA = get(tabs).find((t) => t.path === '/a.md')!
+    await switchToTab(tabA.id)
+    expect(get(content)).toBe('one')
+
+    await switchToTab(get(tabs).find((t) => t.path === '/b.md')!.id)
+    expect(get(content)).toBe('two edited')
+    expect(mockRead).toHaveBeenCalledTimes(2) // neither switch re-read from disk
+  })
+
+  it('ignores a write when no tab is open', () => {
+    content.set('orphan text')
+
+    expect(get(content)).toBe('')
+  })
+
+  it('refuses to overwrite a pdf tab\'s document with text', async () => {
+    mockReadPdf.mockResolvedValue('data:application/pdf;base64,AAA')
+    await openTab('/report.pdf')
+
+    content.set('not a pdf')
+
+    expect(get(pdfDataUrl)).toBe('data:application/pdf;base64,AAA')
+    expect(get(content)).toBe('')
+  })
+
+  it('empties itself when the last tab closes', async () => {
+    mockRead.mockResolvedValue('one')
+    await openTab('/a.md')
+    expect(get(content)).toBe('one')
+
+    await closeTab(get(activeTabId)!)
+
+    expect(get(content)).toBe('')
   })
 })

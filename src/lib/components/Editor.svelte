@@ -209,12 +209,19 @@
     if (switchingTabs) {
       const tab = get(tabs).find((t) => t.id === id)
       const path = tab?.path ?? $currentFile ?? ''
-      // A background reload means the cached state (if any) is stale — drop
-      // it and rebuild from the fresh `content` tabs.ts just fetched instead.
-      const forceFresh = tab?.needsReload ?? false
-      let state = forceFresh ? undefined : editorStates.get(id)
+      const text = get(content)
+      // `editorStates` is purely a cache of this component's own work (undo
+      // history, cursor, selection) — the tab's document itself lives in
+      // stores.ts's `tabDocs`, which tabs.ts may have reloaded from disk
+      // while this tab sat in the background. So the cached state is used
+      // only while it still agrees with that document, and rebuilt when it
+      // doesn't. Validating beats the flag handshake this replaced: there's
+      // no state where the editor and the rest of the app disagree about
+      // what the document says and each is waiting for the other to notice.
+      let state = editorStates.get(id)
+      if (state && state.doc.toString() !== text) state = undefined
       if (!state) {
-        state = createStateFor(path, get(content))
+        state = createStateFor(path, text)
         editorStates.set(id, state)
         // A brand new EditorState means a brand new (empty, for non-markdown)
         // langCompartment slot too, regardless of whether this tab's
@@ -222,21 +229,7 @@
         // state object — so it must be allowed to resolve again here.
         languageResolvedFor.delete(id)
       }
-      // `view.setState()` (below) does NOT fire the updateListener the way a
-      // real dispatch does, so `content` is never otherwise touched by a
-      // switch to an already-cached tab — it would just keep holding
-      // whichever tab's text was last typed into or freshly loaded. That
-      // silently stale `content` is what Preview, Toolbar's "Open in
-      // browser", and — worst of all — save() all read from, so left
-      // unfixed this doesn't just mis-render the preview, it can write one
-      // tab's text into a completely different tab's file on disk. Always
-      // resync it to whatever this tab's *actual* document is before
-      // switching the view to it.
-      content.set(state.doc.toString())
       view.setState(state)
-      if (forceFresh) {
-        tabs.update((ts) => ts.map((t) => (t.id === id ? { ...t, needsReload: false } : t)))
-      }
       restoreScroll(tab?.scrollFraction ?? 0)
       void loadLanguageFor(id, path) // no-ops if already resolved (or markdown)
     } else {
