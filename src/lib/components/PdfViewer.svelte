@@ -9,6 +9,7 @@
     currentPageFromVisibility,
   } from '$lib/pdfLayout'
   import { annotationRectToPercent, resolveDestinationPage, type LinkRect } from '$lib/pdfLinks'
+  import { PageRenders } from '$lib/pdfRender'
   import PdfOutline, { type OutlineNode } from './PdfOutline.svelte'
   import { AnnotationType } from 'pdfjs-dist'
   import type { PDFDocumentProxy, PDFDocumentLoadingTask, PDFPageProxy } from 'pdfjs-dist'
@@ -69,6 +70,10 @@
   // Each page container's visible fraction, from the shared IntersectionObserver
   // below — feeds currentPageFromVisibility() to drive the page indicator.
   const visibleRatios = new Map<number, number>()
+  // In-flight canvas paints, keyed by page number. Outside the reactive
+  // `pages` array for the same reason as canvasRefs and pdfDoc: deep-proxying
+  // a pdf.js class instance risks breaking its internal field access.
+  const renders = new PageRenders()
   let pageObserver: IntersectionObserver | null = null
   let resizeObserver: ResizeObserver | null = null
 
@@ -103,11 +108,12 @@
 
   /** Render (or re-render) one page's canvas at the current zoom — called
    *  when a page first scrolls into view, and again for every
-   *  already-rendered page whenever the zoom changes. `renderGen` guards
-   *  against rapid successive calls for the *same* page (e.g. someone
-   *  mashing zoom in/out): only the most recently-started call for a given
-   *  page is allowed to actually touch its canvas, so an older, slower call
-   *  can't clobber it after a newer one already finished. */
+   *  already-rendered page whenever the zoom changes. Two guards work
+   *  together against rapid successive calls for the *same* page (e.g.
+   *  someone mashing zoom in/out): `renderGen` stops a superseded call from
+   *  proceeding past any of its await points, and `renders` cancels — and
+   *  waits out — the paint already running on the canvas before this one
+   *  resizes it. */
   async function renderPage(entry: PageEntry) {
     const doc = pdfDoc
     const canvas = canvasRefs.get(entry.num)
@@ -117,11 +123,22 @@
     const gen = entry.renderGen
     const page = await doc.getPage(entry.num)
     if (docToken !== renderToken || pdfDoc !== doc || gen !== entry.renderGen) return
+    // Stop (and wait out) any paint already running on this canvas *before*
+    // resizing it. `renderGen` alone can't cover this: it stops a stale call
+    // from starting a paint, but an already-running one keeps drawing into a
+    // context that the resize below silently resets — transform and all. See
+    // pdfRender.ts for the full explanation of why that produces a tiny,
+    // upside-down page.
+    await renders.cancel(entry.num)
+    if (docToken !== renderToken || pdfDoc !== doc || gen !== entry.renderGen) return
     const dpr = window.devicePixelRatio || 1
     const viewport = page.getViewport({ scale: zoom * dpr })
     canvas.width = viewport.width
     canvas.height = viewport.height
-    await page.render({ canvas, viewport }).promise
+    await renders.track(entry.num, page.render({ canvas, viewport }))
+    // A newer render (or a new document) took over while this one painted —
+    // it owns the canvas and the link overlays now.
+    if (docToken !== renderToken || pdfDoc !== doc || gen !== entry.renderGen) return
     // Link annotations don't depend on zoom (their overlay position is
     // stored as page-relative percentages — see pdfLinks.ts), so this only
     // needs to run once per page, not on every re-render.
@@ -215,15 +232,30 @@
    *  zoom per the whole continuous-scroll list is standard PDF-reader UX).
    *  No-op in 'custom' mode (the user picked a specific zoom manually). */
   function applyFitMode() {
-    if (fitMode === 'custom' || !scrollEl || pages.length === 0) return
-    const ref = pages[0]
+    if (pages.length === 0) return
+    const next = fitZoomFor(pages[0])
+    // Re-rendering every visible page is expensive, and each one briefly
+    // resizes a canvas — so don't do it when the answer hasn't changed.
+    // ResizeObserver in particular fires once on observe(), which otherwise
+    // kicked off a redundant second paint of page 1 right as its first was
+    // still in flight.
+    if (next === null || next === zoom) return
+    zoom = next
+    rerenderAllRendered()
+  }
+
+  /** The zoom the current fit mode wants for a page of `ref`'s dimensions, or
+   *  null when there's nothing to compute it from (manual zoom, or before the
+   *  scroll container exists). Separate from applyFitMode so a freshly loaded
+   *  document can settle on its zoom *before* the first paint rather than
+   *  painting once at the old zoom and immediately repainting. */
+  function fitZoomFor(ref: { width: number; height: number }): number | null {
+    if (fitMode === 'custom' || !scrollEl) return null
     const availW = scrollEl.clientWidth - AREA_PADDING_X * 2
     const availH = scrollEl.clientHeight
-    zoom =
-      fitMode === 'width'
-        ? fitWidthScale(availW, ref.width)
-        : fitPageScale(availW, availH, ref.width, ref.height)
-    rerenderAllRendered()
+    return fitMode === 'width'
+      ? fitWidthScale(availW, ref.width)
+      : fitPageScale(availW, availH, ref.width, ref.height)
   }
 
   async function loadDoc(dataUrl: string) {
@@ -232,6 +264,7 @@
     loading = true
     errorMsg = ''
     loadingTask?.destroy()
+    await renders.cancelAll()
     pdfDoc = null
     pages = []
     numPages = 0
@@ -273,6 +306,12 @@
       if (token !== renderToken) return
       pdfDoc = doc
       numPages = doc.numPages
+      // Settle on the fit-mode zoom *before* the page containers mount, so the
+      // IntersectionObserver's first paint of page 1 already uses the final
+      // scale instead of painting at the previous document's zoom and being
+      // immediately repainted.
+      const fit = fitZoomFor(entries[0])
+      if (fit !== null) zoom = fit
       pages = entries
       // Table of contents, if this PDF has one — most don't, in which case
       // this resolves to an empty array and the toolbar button stays hidden.
@@ -391,6 +430,7 @@
   })
 
   onDestroy(() => {
+    void renders.cancelAll()
     loadingTask?.destroy()
   })
 </script>
