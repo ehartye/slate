@@ -7,10 +7,18 @@
 // PDF tabs are a separate case (a PDF isn't text, so there's no CodeMirror
 // doc at all): their rendered content lives in the `pdfDataUrl` store instead
 // of `content`, backed by `pdfCache` below — a per-tab cache kept here rather
-// than in PdfViewer.svelte, since (unlike Editor.svelte, which stays mounted
-// for the whole session) PdfViewer only mounts while a PDF tab is active, so
-// a component-local cache would be lost every time the user tabs away from
-// all PDFs and back.
+// than in PdfViewer.svelte, since PdfViewer only mounts while a PDF tab is
+// active, so a component-local cache would be lost every time the user tabs
+// away from all PDFs and back.
+//
+// `textCache` below is the same idea for text tabs, and exists for the same
+// reason: Editor.svelte is NOT always mounted either (+page.svelte unmounts
+// the whole editor pane when it's collapsed, and when a PDF tab is active),
+// so its per-tab EditorState cache can't be the only home for a tab's text.
+// Switching tabs must set `content` here, from state this module owns —
+// everything downstream (Preview, "Open in browser", and save()) reads
+// `content`, so leaving it to a component that may not be mounted meant a
+// tab switch could leave `content` holding the *previous* tab's text.
 import { get } from 'svelte/store'
 import {
   tabs, activeTabId, currentFile, content, dirty, editorScroll, reloadTrigger, statusMsg,
@@ -27,6 +35,7 @@ function nextTabId(): string {
 }
 
 const pdfCache = new Map<string, string>() // tab id -> data: URL
+const textCache = new Map<string, string>() // tab id -> document text
 
 /** The currently open tab with this path, if any. */
 export function findTabByPath(path: string): Tab | undefined {
@@ -34,12 +43,18 @@ export function findTabByPath(path: string): Tab | undefined {
 }
 
 /** Snapshot the active tab's live values back into its tabs-array entry —
- *  call this before switching away from it so nothing is lost. */
+ *  call this before switching away from it so nothing is lost. Also caches
+ *  its text (including unsaved edits, and any reload another module wrote
+ *  straight into `content`), which is what lets a later switch back restore
+ *  the right document even if Editor.svelte was never mounted. */
 function captureActiveTabState(): void {
   const id = get(activeTabId)
   if (!id) return
+  const active = get(tabs).find((t) => t.id === id)
+  if (!active) return // e.g. the tab was just closed — nothing to snapshot
   const snapshotDirty = get(dirty)
   const snapshotScroll = get(editorScroll)
+  if (!isPdfPath(active.path)) textCache.set(id, get(content))
   tabs.update((ts) =>
     ts.map((t) => (t.id === id ? { ...t, dirty: snapshotDirty, scrollFraction: snapshotScroll } : t)),
   )
@@ -86,6 +101,7 @@ export async function openTab(path: string): Promise<void> {
   }
   captureActiveTabState()
   tabs.update((ts) => [...ts, tab])
+  textCache.set(tab.id, text)
   activeTabId.set(tab.id)
   currentFile.set(path)
   content.set(text)
@@ -128,14 +144,26 @@ export async function switchToTab(id: string): Promise<void> {
 
   pdfDataUrl.set(null)
   editorScroll.set(target.scrollFraction)
-  if (target.needsReload) {
-    if (target.dirty) {
+  // Restore this tab's own text before anything downstream reads `content`.
+  // Editor.svelte may not be mounted (collapsed editor pane, or we're coming
+  // from a PDF tab), so it can't be relied on to do this.
+  const cachedText = textCache.get(id)
+  content.set(cachedText ?? '')
+  // A missing cache entry shouldn't be able to blank a document (`content` is
+  // what save() writes), so it falls back to a disk read just like a stale one.
+  if (target.needsReload || cachedText === undefined) {
+    if (target.needsReload && target.dirty) {
       statusMsg.set('File changed on disk — save or discard changes to reload')
     } else {
       try {
-        content.set(await readFile(target.path))
+        const fresh = await readFile(target.path)
+        textCache.set(id, fresh)
+        content.set(fresh)
+        // Editor.svelte may already have rebuilt its state from the (stale)
+        // `content` above while this read was in flight — bumping the trigger
+        // makes it resync from the fresh text either way.
         reloadTrigger.update((n) => n + 1)
-        statusMsg.set('Reloaded from disk')
+        if (target.needsReload) statusMsg.set('Reloaded from disk')
       } catch (e) {
         statusMsg.set(`Could not reload: ${e}`)
       }
@@ -155,6 +183,7 @@ export async function closeTab(id: string): Promise<void> {
   const remaining = current.filter((t) => t.id !== id)
   tabs.set(remaining)
   pdfCache.delete(id)
+  textCache.delete(id)
 
   if (get(activeTabId) !== id) return // closed a background tab — active tab unaffected
 

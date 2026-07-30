@@ -145,6 +145,51 @@ describe('switchToTab', () => {
 
     expect(get(statusMsg)).toContain('save or discard')
   })
+
+  // Regression: `content` used to be resynced only by Editor.svelte's
+  // tab-switch effect, but +page.svelte unmounts the editor pane when it's
+  // collapsed (and while a PDF tab is active), so a switch could leave
+  // `content` — what Preview renders and save() writes — on the previous tab.
+  it('restores the target tab\'s text without any editor involvement', async () => {
+    mockRead.mockResolvedValueOnce('one').mockResolvedValueOnce('two')
+    await openTab('/a.md')
+    await openTab('/b.md')
+
+    const tabA = get(tabs).find((t) => t.path === '/a.md')!
+    await switchToTab(tabA.id)
+
+    expect(get(content)).toBe('one')
+    expect(mockRead).toHaveBeenCalledTimes(2) // served from cache, not re-read
+  })
+
+  it('carries a tab\'s unsaved edits back with it across a switch', async () => {
+    mockRead.mockResolvedValueOnce('one').mockResolvedValueOnce('two')
+    await openTab('/a.md')
+    content.set('one edited')
+    dirty.set(true)
+    await openTab('/b.md')
+    expect(get(content)).toBe('two')
+
+    const tabA = get(tabs).find((t) => t.path === '/a.md')!
+    await switchToTab(tabA.id)
+
+    expect(get(content)).toBe('one edited')
+    expect(get(dirty)).toBe(true)
+  })
+
+  it('restores text when switching back from a pdf tab', async () => {
+    mockRead.mockResolvedValueOnce('one')
+    mockReadPdf.mockResolvedValue('data:application/pdf;base64,AAA')
+    await openTab('/a.md')
+    await openTab('/doc.pdf')
+    expect(get(content)).toBe('')
+
+    const tabA = get(tabs).find((t) => t.path === '/a.md')!
+    await switchToTab(tabA.id)
+
+    expect(get(content)).toBe('one')
+    expect(get(pdfDataUrl)).toBe(null)
+  })
 })
 
 describe('closeTab', () => {
