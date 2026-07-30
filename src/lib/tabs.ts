@@ -2,19 +2,23 @@
 // and scroll fraction; the CodeMirror EditorState per tab is cached inside
 // Editor.svelte (the only place that needs it), and swapped in via
 // `view.setState(...)` when `activeTabId` changes — the idiomatic CodeMirror 6
-// pattern for one editor view backing several open documents.
+// pattern for one editor view backing several open documents. That cache is
+// only ever a cache: Editor.svelte validates it against the tab's document
+// and rebuilds when they disagree, so it can't be the reason a stale document
+// stays on screen.
 //
-// PDF tabs are a separate case (a PDF isn't text, so there's no CodeMirror
-// doc at all): their rendered content lives in the `pdfDataUrl` store instead
-// of `content`, backed by `pdfCache` below — a per-tab cache kept here rather
-// than in PdfViewer.svelte, since (unlike Editor.svelte, which stays mounted
-// for the whole session) PdfViewer only mounts while a PDF tab is active, so
-// a component-local cache would be lost every time the user tabs away from
-// all PDFs and back.
+// A tab's actual document — text or PDF — belongs to `tabDocs` in stores.ts,
+// keyed by tab id, and the `content`/`pdfDataUrl` stores are views of
+// *whichever tab is active*. That's why nothing below has to explicitly push
+// a document into a store when switching tabs: setting `activeTabId` is the
+// swap. It used to be an extra step, and one that Editor.svelte performed —
+// which broke whenever the editor pane wasn't mounted (collapsed, or a PDF
+// tab active), leaving `content` — what Preview renders and save() writes —
+// pointing at the *previous* tab.
 import { get } from 'svelte/store'
 import {
-  tabs, activeTabId, currentFile, content, dirty, editorScroll, reloadTrigger, statusMsg,
-  pdfDataUrl, type Tab,
+  tabs, activeTabId, currentFile, dirty, editorScroll, reloadTrigger, statusMsg,
+  setTabText, setTabPdf, dropTabDoc, hasTabDoc, type Tab,
 } from './stores'
 import { readFile, readPdfAsDataUrl } from './tauri'
 import { isPdfPath } from './fileKind'
@@ -26,15 +30,15 @@ function nextTabId(): string {
   return `tab-${counter}`
 }
 
-const pdfCache = new Map<string, string>() // tab id -> data: URL
-
 /** The currently open tab with this path, if any. */
 export function findTabByPath(path: string): Tab | undefined {
   return get(tabs).find((t) => t.path === path)
 }
 
 /** Snapshot the active tab's live values back into its tabs-array entry —
- *  call this before switching away from it so nothing is lost. */
+ *  call this before switching away from it so nothing is lost. (Its document
+ *  needs no snapshotting: edits are written straight to the tab's own entry
+ *  in `tabDocs` as they happen.) */
 function captureActiveTabState(): void {
   const id = get(activeTabId)
   if (!id) return
@@ -67,13 +71,13 @@ export async function openTab(path: string): Promise<void> {
       return
     }
     captureActiveTabState()
-    pdfCache.set(tab.id, dataUrl)
+    // The document goes in before the tab is activated, so `pdfDataUrl` is
+    // never briefly empty for a tab that in fact has content.
+    setTabPdf(tab.id, dataUrl)
     tabs.update((ts) => [...ts, tab])
     activeTabId.set(tab.id)
     currentFile.set(path)
-    content.set('')
     dirty.set(false)
-    pdfDataUrl.set(dataUrl)
     return
   }
 
@@ -85,13 +89,12 @@ export async function openTab(path: string): Promise<void> {
     return
   }
   captureActiveTabState()
+  setTabText(tab.id, text)
   tabs.update((ts) => [...ts, tab])
   activeTabId.set(tab.id)
   currentFile.set(path)
-  content.set(text)
   dirty.set(false)
   editorScroll.set(0)
-  pdfDataUrl.set(null)
 }
 
 /** Switch to an already-open tab by id. Restores its dirty/scroll snapshot;
@@ -101,49 +104,45 @@ export async function switchToTab(id: string): Promise<void> {
   if (id === get(activeTabId)) return
   const target = get(tabs).find((t) => t.id === id)
   if (!target) return
+  const isPdf = isPdfPath(target.path)
+
   captureActiveTabState()
+  // This *is* the document swap: `content` and `pdfDataUrl` are views of the
+  // active tab's entry in `tabDocs`, so there's no second "…and now push the
+  // document into a store" step that could be skipped or done by a component
+  // that happens not to be mounted.
   activeTabId.set(id)
   currentFile.set(target.path)
   dirty.set(target.dirty)
+  if (!isPdf) editorScroll.set(target.scrollFraction)
 
-  if (isPdfPath(target.path)) {
-    const cached = pdfCache.get(id)
-    if (!target.needsReload && cached) {
-      pdfDataUrl.set(cached)
-      return
-    }
-    try {
-      const dataUrl = await readPdfAsDataUrl(target.path)
-      pdfCache.set(id, dataUrl)
-      pdfDataUrl.set(dataUrl)
-      if (target.needsReload) {
-        tabs.update((ts) => ts.map((t) => (t.id === id ? { ...t, needsReload: false } : t)))
-        statusMsg.set('Reloaded from disk')
-      }
-    } catch (e) {
-      statusMsg.set(`Could not reload: ${e}`)
-    }
+  // Defensively treat a missing document like a stale one: falling through
+  // with nothing loaded would show (and, for a text tab, let save() write) an
+  // empty document.
+  const stale = target.needsReload || !hasTabDoc(id)
+  if (!stale) return
+  if (target.needsReload && target.dirty) {
+    statusMsg.set('File changed on disk — save or discard changes to reload')
     return
   }
 
-  pdfDataUrl.set(null)
-  editorScroll.set(target.scrollFraction)
-  if (target.needsReload) {
-    if (target.dirty) {
-      statusMsg.set('File changed on disk — save or discard changes to reload')
+  try {
+    if (isPdf) {
+      setTabPdf(id, await readPdfAsDataUrl(target.path))
     } else {
-      try {
-        content.set(await readFile(target.path))
-        reloadTrigger.update((n) => n + 1)
-        statusMsg.set('Reloaded from disk')
-      } catch (e) {
-        statusMsg.set(`Could not reload: ${e}`)
-      }
+      setTabText(id, await readFile(target.path))
+      // Editor.svelte may already have built this tab's editor state from the
+      // pre-reload text while the read was in flight; the trigger makes it
+      // resync from what's now on disk.
+      reloadTrigger.update((n) => n + 1)
     }
+    if (target.needsReload) {
+      tabs.update((ts) => ts.map((t) => (t.id === id ? { ...t, needsReload: false } : t)))
+      statusMsg.set('Reloaded from disk')
+    }
+  } catch (e) {
+    statusMsg.set(`Could not reload: ${e}`)
   }
-  // Editor.svelte's own effect (keyed on activeTabId) is responsible for
-  // clearing `needsReload` once it has rebuilt that tab's editor state from
-  // the fresh content — see its `tabNeedsFreshState` check.
 }
 
 /** Close a tab. Picks the right neighbor, then the left neighbor, then no
@@ -154,17 +153,17 @@ export async function closeTab(id: string): Promise<void> {
   if (idx === -1) return
   const remaining = current.filter((t) => t.id !== id)
   tabs.set(remaining)
-  pdfCache.delete(id)
+  dropTabDoc(id)
 
   if (get(activeTabId) !== id) return // closed a background tab — active tab unaffected
 
   if (remaining.length === 0) {
     activeTabId.set(null)
     currentFile.set(null)
-    content.set('')
     dirty.set(false)
     editorScroll.set(0)
-    pdfDataUrl.set(null)
+    // `content`/`pdfDataUrl` empty themselves — with no active tab there's no
+    // document for them to be a view of.
     return
   }
   const next = current[idx + 1] ?? current[idx - 1]
