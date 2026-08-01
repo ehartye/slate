@@ -6,7 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Slate** is a lightweight, themable markdown editor/viewer for the desktop, built with Tauri 2 (Rust shell + system WebView) and a SvelteKit frontend. It runs as a native window using the OS webview (no bundled Chromium), so it stays small and low-memory. Single user, one file open at a time, point-at-a-folder file model.
 
-Note: the package/crate are still named `scaffold` (from the Tauri template); the product is `Slate` (`tauri.conf.json`, identifier `com.hartye.slate`). Don't rename to "match" — they're intentionally distinct.
+Everything is named **Slate**: the npm package (`package.json`), the Cargo crate and its lib target (`src-tauri/Cargo.toml` — `slate` / `slate_lib`, referenced by `main.rs`), the product name and shipped executable (`tauri.conf.json` — `productName` and `mainBinaryName`, identifier `com.hartye.slate`). These were `scaffold` / `scaffold_lib` (left over from the `create-tauri-app` template) until renamed; if you see `scaffold` anywhere outside `docs/superpowers/`, it's a leftover and should be `slate`. In the docs it's the verb ("scaffold the app"), not the name — leave those alone.
+
+`mainBinaryName` is what makes the installed binary `Slate.exe` rather than taking the Cargo bin name. Without it the process shows up in Task Manager under the crate name, which is a confusing thing to hand someone diagnosing the app.
 
 Design and plan docs live in `docs/superpowers/` — read `specs/2026-06-25-markdown-viewer-design.md` for the original architecture and the explicit v1 out-of-scope list before adding features.
 
@@ -26,6 +28,18 @@ cargo build            # compile the Rust shell
 ```
 
 There is no lint step configured. `npm run check` is the typecheck gate.
+
+## Versioning and local dev installs
+
+```bash
+npm run tauri build -- --bundles nsis    # Windows installer -> src-tauri/target/release/bundle/nsis/
+```
+
+The version lives in **three** files that must be bumped together: `src-tauri/tauri.conf.json`, `package.json`, and `src-tauri/Cargo.toml`. `tauri.conf.json` is the one that actually matters — it overrides Cargo's version for the bundle, and it's what ends up in the installer filename, the Add/Remove Programs entry, and the uninstall registry key. The other two are kept in sync so nothing reads a stale number, not because the bundler consults them.
+
+**Bump the `-dev.N` suffix every time you build an installer to install locally.** The registry and Add/Remove Programs record only the version string, so two installs built from different commits at the same version are indistinguishable there — the sole evidence of which build is actually on the machine is the `.exe` file timestamp, which nobody thinks to check. Installing over an identical version also gives you no signal that the upgrade took. Released builds drop the suffix (`0.1.0`); dev builds carry it (`0.1.0-dev.1`, `0.1.0-dev.2`, …), which also sorts them *below* the release in semver, so a stale dev install never looks newer than a real one.
+
+This is a manual convention with a manual failure mode — forget the bump and you're back to indistinguishable installs. If that starts biting, the fix is a script that stamps the suffix from `git rev-parse --short HEAD` at build time rather than a hand-edited number; it wasn't worth the machinery yet.
 
 ## Architecture
 
