@@ -15,7 +15,7 @@
   } from '$lib/stores'
   import { isMarkdownPath } from '$lib/fileKind'
   import { baseName } from '$lib/tauri'
-  import { languageNameFor } from '$lib/language'
+  import { languageCorrectionFor, languageFallbackFor } from '$lib/language'
 
   // Markdown source highlighting that follows the active theme via CSS variables.
   const mdHighlight = HighlightStyle.define([
@@ -150,14 +150,28 @@
    *  is currently canonical for `tabId`: the live view if it's still the
    *  active tab, or the cached background state otherwise — never blindly
    *  assumed to still be the active tab. */
-  /** language-data's filename matching, with `languageNameFor`'s overrides
-   *  consulted first — that map exists precisely for the names matchFilename
-   *  misses (every dotfile, `.svelte`) or resolves wrongly (`.cfg`), so it has
-   *  to win rather than act as a fallback. Null from both means plain text. */
+  /** Resolve a file's language in three steps, in this order:
+   *
+   *  1. a *correction*, for the names language-data resolves wrongly (`.cfg`
+   *     → TTCN_CFG) — there is a bad answer to beat, so this goes first;
+   *  2. language-data's own `matchFilename`;
+   *  3. a *fallback*, for names it resolves to nothing (every dotfile,
+   *     `.svelte`) — filling a gap only makes sense once it has had its say.
+   *
+   *  Steps 1 and 3 are separate maps rather than one because collapsing them
+   *  breaks step 2: a blanket `.conf` rule ahead of matchFilename takes
+   *  `nginx.conf` away from Nginx, which language-data gets right. Null from
+   *  all three means plain text. */
   function matchLanguage(path: string): LanguageDescription | null {
-    const override = languageNameFor(path)
-    const byName = override ? LanguageDescription.matchLanguageName(languages, override) : null
-    return byName ?? LanguageDescription.matchFilename(languages, baseName(path))
+    const correction = languageCorrectionFor(path)
+    if (correction) {
+      const corrected = LanguageDescription.matchLanguageName(languages, correction)
+      if (corrected) return corrected
+    }
+    const byFilename = LanguageDescription.matchFilename(languages, baseName(path))
+    if (byFilename) return byFilename
+    const fallback = languageFallbackFor(path)
+    return fallback ? LanguageDescription.matchLanguageName(languages, fallback) : null
   }
 
   async function loadLanguageFor(tabId: string, path: string) {

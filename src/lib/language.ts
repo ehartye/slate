@@ -56,14 +56,26 @@ const BY_FILENAME: Record<string, string> = {
   '.gitattributes': PROPERTIES,
 }
 
-/** Extensions (without the dot), lowercased. */
+/** Extensions language-data resolves to something *actively wrong*, which a
+ *  correction must therefore beat rather than merely fall back to.
+ *
+ *  Kept as small as the evidence justifies — one entry. `.cfg` resolves to
+ *  TTCN_CFG, a telecom test notation, where a `.cfg` file is INI-shaped in
+ *  practice. Anything language-data simply does not know belongs below
+ *  instead, as a fallback. */
+const CORRECTIONS: Record<string, string> = {
+  cfg: PROPERTIES,
+}
+
+/** Extensions (without the dot), lowercased — used only when language-data
+ *  resolves nothing. */
 const BY_EXTENSION: Record<string, string> = {
   // Svelte components are HTML-shaped: markup with <script> and <style>.
   // Not a Svelte grammar, but far better than the nothing it resolves to now.
   svelte: HTML,
-  // language-data sends .cfg to TTCN_CFG, a telecom test notation. In
-  // practice a .cfg file is INI-shaped, as is .conf, which matches nothing.
-  cfg: PROPERTIES,
+  // A bare `.conf` matches nothing. This being a fallback rather than a
+  // correction is load-bearing: language-data resolves some conf files by
+  // full name — `nginx.conf` is Nginx — and those have to keep winning.
   conf: PROPERTIES,
   env: PROPERTIES,
 }
@@ -75,23 +87,39 @@ const BY_EXTENSION: Record<string, string> = {
  *  highlight reads as a bug in a way that plain text does not. They stay
  *  unhighlighted until a real grammar is available. */
 
-/**
- * The language-data language name to use for `path`, or `null` to defer to
- * `LanguageDescription.matchFilename`.
- *
- * Accepts a full path or a bare filename; only the last segment is consulted.
- * Matching is case-insensitive because Windows filenames are.
- */
-export function languageNameFor(path: string): string | null {
-  const name = (path.split(/[\\/]/).pop() ?? path).toLowerCase()
-  if (name in BY_FILENAME) return BY_FILENAME[name]
+/** The last path segment, lowercased. Windows filenames are case-insensitive,
+ *  and language-data's own matching is too. */
+function fileNameOf(path: string): string {
+  return (path.split(/[\\/]/).pop() ?? path).toLowerCase()
+}
 
-  // Take the last dot segment, but only when the name has a real stem —
-  // `.bashrc` is a dotfile, not a file with a "bashrc" extension.
+/** The extension of `name`, or '' — only when there is a real stem, since
+ *  `.bashrc` is a dotfile, not a file with a "bashrc" extension. */
+function extensionOf(name: string): string {
   const dot = name.lastIndexOf('.')
-  if (dot > 0) {
-    const ext = name.slice(dot + 1)
-    if (ext in BY_EXTENSION) return BY_EXTENSION[ext]
-  }
-  return null
+  return dot > 0 ? name.slice(dot + 1) : ''
+}
+
+/**
+ * A language name that must be used *instead of* whatever
+ * `LanguageDescription.matchFilename` says, because what it says is wrong.
+ * `null` — the overwhelmingly common case — means it has no wrong answer here.
+ */
+export function languageCorrectionFor(path: string): string | null {
+  return CORRECTIONS[extensionOf(fileNameOf(path))] ?? null
+}
+
+/**
+ * A language name to use only when `matchFilename` resolves nothing at all.
+ *
+ * Separate from a correction because the two must not be applied at the same
+ * point: filling a gap has to happen *after* language-data has had its say,
+ * or a blanket extension rule silently outranks a more specific filename
+ * match that was right — `.conf` mapped ahead of matchFilename would take
+ * `nginx.conf` away from Nginx and give it to Properties.
+ */
+export function languageFallbackFor(path: string): string | null {
+  const name = fileNameOf(path)
+  if (name in BY_FILENAME) return BY_FILENAME[name]
+  return BY_EXTENSION[extensionOf(name)] ?? null
 }
