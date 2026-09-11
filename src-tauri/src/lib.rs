@@ -160,6 +160,7 @@ fn list_text_files(folder: String, show_hidden: bool) -> Result<Vec<String>, Str
     let dir = std::path::Path::new(&folder);
     let mut paths = listing::text_files_in(dir, show_hidden).map_err(|e| e.to_string())?;
     paths.extend(listing::pdf_files_in(dir, show_hidden).map_err(|e| e.to_string())?);
+    paths.extend(listing::image_files_in(dir, show_hidden).map_err(|e| e.to_string())?);
     paths.sort_by_key(|p| p.file_name().map(|n| n.to_ascii_lowercase()));
     Ok(paths
         .into_iter()
@@ -200,10 +201,30 @@ fn resolve_image_data_url(base: String, href: String) -> Result<Option<String>, 
     let Some(path) = files::resolve_image_link(std::path::Path::new(&base), &href) else {
         return Ok(None);
     };
-    let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
-    let mime = files::image_mime(&path);
+    image_data_url(&path).map(Some)
+}
+
+/// Read an image and encode it as a `data:` URL. Shared by the two ways an
+/// image reaches the webview — a relative link inside a markdown document,
+/// and an image opened as its own tab — so both agree on MIME type and
+/// encoding.
+fn image_data_url(path: &std::path::Path) -> Result<String, String> {
+    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+    let mime = files::image_mime(path);
     let b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, bytes);
-    Ok(Some(format!("data:{mime};base64,{b64}")))
+    Ok(format!("data:{mime};base64,{b64}"))
+}
+
+/// Read an image file as a `data:` URL for an image tab. Mirrors
+/// `read_pdf_as_data_url`: a binary format the webview renders directly,
+/// never routed through `read_file`.
+#[tauri::command]
+fn read_image_as_data_url(path: String) -> Result<String, String> {
+    let p = std::path::Path::new(&path);
+    if !files::is_image(p) {
+        return Err("not an image file".to_string());
+    }
+    image_data_url(p)
 }
 
 /// Read a PDF file's bytes as a `data:` URL, for the frontend's bundled
@@ -409,6 +430,7 @@ pub fn run() {
             resolve_md_link,
             resolve_image_data_url,
             read_pdf_as_data_url,
+            read_image_as_data_url,
             write_file,
             watch_file,
             unwatch_file,

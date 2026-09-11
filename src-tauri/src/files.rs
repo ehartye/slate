@@ -51,6 +51,13 @@ pub fn is_pdf(path: &Path) -> bool {
     has_extension(path, PDF_EXTENSIONS)
 }
 
+/// Whether `path` has a recognized image extension. Like PDF, an image is
+/// opened by its own viewer rather than `read_file` — see
+/// `read_image_as_data_url` in `lib.rs`.
+pub fn is_image(path: &Path) -> bool {
+    has_extension(path, IMAGE_EXTENSIONS)
+}
+
 /// Whether `path` has an extension this app can be launched to open — via OS
 /// file-association double-click/"Open With" (macOS Apple Events, Windows
 /// CLI arg). Markdown loads as an editable tab, PDF as a read-only viewer
@@ -294,4 +301,13 @@ mod tests {
         assert_eq!(got, "index.html?open=%2FUsers%2Fme%2FMy+Notes%2Fa+b.md");
     }
 
+    #[test]
+    fn is_image_checks_extension_case_insensitively() {
+        assert!(is_image(Path::new("a.png")));
+        assert!(is_image(Path::new("A.JPEG")));
+        assert!(is_image(Path::new("logo.svg")));
+        assert!(!is_image(Path::new("a.pdf")));
+        assert!(!is_image(Path::new("a.md")));
+        assert!(!is_image(Path::new("noext")));
+    }
 }

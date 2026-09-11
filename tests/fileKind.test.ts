@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { extensionOf, isMarkdownPath, isPdfPath, renderNonMarkdownPreview } from '../src/lib/fileKind'
+import {
+  extensionOf,
+  isMarkdownPath,
+  isPdfPath,
+  isImagePath,
+  isViewerPath,
+  renderNonMarkdownPreview,
+} from '../src/lib/fileKind'
 
 describe('extensionOf', () => {
   it('returns the lowercased extension', () => {
@@ -58,5 +65,35 @@ describe('renderNonMarkdownPreview', () => {
     // embedded backticks into separate markdown constructs.
     expect(out).toContain('<pre')
     expect((out.match(/<pre/g) ?? []).length).toBe(1)
+  })
+})
+
+describe('isImagePath', () => {
+  it('recognizes the image formats the viewer can render', () => {
+    expect(isImagePath('/pics/shot.png')).toBe(true)
+    expect(isImagePath('C:\pics\Photo.JPG')).toBe(true)
+    expect(isImagePath('/pics/anim.gif')).toBe(true)
+    expect(isImagePath('/pics/logo.svg')).toBe(true)
+  })
+  it('rejects everything else, including null', () => {
+    expect(isImagePath('/docs/notes.md')).toBe(false)
+    expect(isImagePath('/docs/paper.pdf')).toBe(false)
+    expect(isImagePath('/docs/Makefile')).toBe(false)
+    expect(isImagePath(null)).toBe(false)
+  })
+})
+
+describe('isViewerPath', () => {
+  it('is true for the formats that open in their own viewer, not the editor', () => {
+    // What +page.svelte and tabs.ts actually need to know: this tab has no
+    // editable text behind it, so the editor pane and its rail stay hidden.
+    expect(isViewerPath('/docs/paper.pdf')).toBe(true)
+    expect(isViewerPath('/pics/shot.png')).toBe(true)
+  })
+  it('is false for text, which is what CodeMirror backs', () => {
+    expect(isViewerPath('/docs/notes.md')).toBe(false)
+    expect(isViewerPath('/src/main.rs')).toBe(false)
+    expect(isViewerPath('/project/.gitignore')).toBe(false)
+    expect(isViewerPath(null)).toBe(false)
   })
 })

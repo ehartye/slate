@@ -6,6 +6,7 @@
   import Editor from '$lib/components/Editor.svelte'
   import Preview from '$lib/components/Preview.svelte'
   import PdfViewer from '$lib/components/PdfViewer.svelte'
+  import ImageViewer from '$lib/components/ImageViewer.svelte'
   import { onMount } from 'svelte'
   import { invoke } from '@tauri-apps/api/core'
   import { listen } from '@tauri-apps/api/event'
@@ -17,7 +18,7 @@
   import { writeFile, readFile, openNewWindow, baseName } from '$lib/tauri'
   import { loadFile } from '$lib/workspace'
   import { closeTab, cycleTab, markBackgroundTabForReload } from '$lib/tabs'
-  import { isMarkdownPath, isPdfPath } from '$lib/fileKind'
+  import { isMarkdownPath, isPdfPath, isImagePath, isViewerPath } from '$lib/fileKind'
   import { loadZoom, setZoom, nudgeZoom } from '$lib/zoom'
   import { loadSidebarWidth, clampSidebarWidth, persistSidebarWidth } from '$lib/sidebarWidth'
   import { loadMdOnlyMode, loadShowHiddenFiles } from '$lib/viewOptions'
@@ -45,6 +46,10 @@
   // full-width, regardless of the user's editorCollapsed/previewCollapsed
   // preferences for text tabs — there'd be nothing else to display otherwise.
   let isPdfActive = $derived(isPdfPath($currentFile))
+  let isImageActive = $derived(isImagePath($currentFile))
+  // The layout's real question is "is there editable text behind this tab?".
+  // Hiding the editor pane keys off that, not off each viewer format.
+  let isViewerActive = $derived(isViewerPath($currentFile))
   // Paths whose *next* file-changed event should be ignored (our own save,
   // not an external edit) — per-path since several tabs can be open at once.
   let suppressNextChangeFor = new Set<string>()
@@ -251,7 +256,7 @@
     <div class="content-area">
       <TabBar />
       <div class="split">
-      {#if !isPdfActive}
+      {#if !isViewerActive}
         {#if $editorCollapsed}
           <button class="rail" onclick={() => editorCollapsed.set(false)} title="Expand editor">
             <span class="rail-icon">›</span><span class="rail-label">Editor</span>
@@ -276,20 +281,20 @@
         {/if}
       {/if}
 
-      {#if $previewCollapsed && !isPdfActive}
+      {#if $previewCollapsed && !isViewerActive}
         <button class="rail right" onclick={() => previewCollapsed.set(false)} title="Expand preview">
           <span class="rail-icon">‹</span><span class="rail-label">Preview</span>
         </button>
       {:else}
         <section class="preview-pane pane" style="flex:1">
           <div class="pane-head">
-            <span class="label">{isPdfActive ? 'PDF' : 'Preview'}</span>
-            {#if !$editorCollapsed && !isPdfActive}
+            <span class="label">{isPdfActive ? 'PDF' : isImageActive ? 'Image' : 'Preview'}</span>
+            {#if !$editorCollapsed && !isViewerActive}
               <button class="collapse-btn" onclick={() => previewCollapsed.set(true)} title="Collapse preview">›</button>
             {/if}
           </div>
           <div class="pane-content preview-scroll" bind:this={previewPane}>
-            {#if isPdfActive}<PdfViewer />{:else}<Preview />{/if}
+            {#if isPdfActive}<PdfViewer />{:else if isImageActive}<ImageViewer />{:else}<Preview />{/if}
           </div>
         </section>
       {/if}

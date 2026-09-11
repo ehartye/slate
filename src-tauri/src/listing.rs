@@ -148,6 +148,14 @@ pub fn pdf_files_in(dir: &Path, show_hidden: bool) -> std::io::Result<Vec<PathBu
     files_with_extensions_in(dir, PDF_EXTENSIONS, show_hidden)
 }
 
+/// Return absolute paths of image files directly in `dir`, sorted by file
+/// name — listed alongside `text_files_in` when Markdown-only mode is off, on
+/// the same footing as PDFs: part of the browsing surface, viewed rather than
+/// edited. Hidden files are skipped unless `show_hidden` is set.
+pub fn image_files_in(dir: &Path, show_hidden: bool) -> std::io::Result<Vec<PathBuf>> {
+    files_with_extensions_in(dir, IMAGE_EXTENSIONS, show_hidden)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -346,5 +354,28 @@ mod tests {
             names_of(&text_files_in(dir.path(), true).unwrap()),
             vec!["plain.txt", "secret.txt"]
         );
+    }
+
+    #[test]
+    fn lists_image_files_sorted_separately_from_text() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("b.PNG"), [0x89, 0x50]).unwrap();
+        fs::write(dir.path().join("a.jpg"), [0xff, 0xd8]).unwrap();
+        fs::write(dir.path().join("logo.svg"), "<svg/>").unwrap();
+        fs::write(dir.path().join("notes.md"), "# hi").unwrap();
+
+        assert_eq!(names_of(&image_files_in(dir.path(), false).unwrap()), vec!["a.jpg", "b.PNG", "logo.svg"]);
+        // The text listing stays disjoint from it.
+        assert_eq!(names_of(&text_files_in(dir.path(), false).unwrap()), vec!["notes.md"]);
+    }
+
+    #[test]
+    fn hides_hidden_images_unless_asked() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join(".secret.png"), [0x89]).unwrap();
+        fs::write(dir.path().join("shown.png"), [0x89]).unwrap();
+
+        assert_eq!(names_of(&image_files_in(dir.path(), false).unwrap()), vec!["shown.png"]);
+        assert_eq!(names_of(&image_files_in(dir.path(), true).unwrap()), vec![".secret.png", "shown.png"]);
     }
 }

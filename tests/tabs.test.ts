@@ -3,20 +3,21 @@ import { get } from 'svelte/store'
 
 vi.mock('../src/lib/tauri', async (importOriginal) => {
   const orig = await importOriginal<typeof import('../src/lib/tauri')>()
-  return { ...orig, readFile: vi.fn(), readPdfAsDataUrl: vi.fn() }
+  return { ...orig, readFile: vi.fn(), readPdfAsDataUrl: vi.fn(), readImageAsDataUrl: vi.fn() }
 })
 
 import {
   openTab, switchToTab, closeTab, findTabByPath, markBackgroundTabForReload, cycleTab,
 } from '../src/lib/tabs'
-import { readFile, readPdfAsDataUrl } from '../src/lib/tauri'
+import { readFile, readPdfAsDataUrl, readImageAsDataUrl } from '../src/lib/tauri'
 import {
   tabs, activeTabId, currentFile, content, dirty, editorScroll, reloadTrigger, statusMsg,
-  pdfDataUrl,
+  pdfDataUrl, imageDataUrl,
 } from '../src/lib/stores'
 
 const mockRead = vi.mocked(readFile)
 const mockReadPdf = vi.mocked(readPdfAsDataUrl)
+const mockReadImage = vi.mocked(readImageAsDataUrl)
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -453,5 +454,49 @@ describe('content is scoped to the active tab', () => {
     await closeTab(get(activeTabId)!)
 
     expect(get(content)).toBe('')
+  })
+})
+
+describe('image tabs', () => {
+  it('opens an image through the image reader, not readFile', async () => {
+    mockReadImage.mockResolvedValue('data:image/png;base64,AAAA')
+
+    await openTab('/pics/shot.png')
+
+    expect(mockReadImage).toHaveBeenCalledWith('/pics/shot.png')
+    expect(mockRead).not.toHaveBeenCalled()
+    expect(get(imageDataUrl)).toBe('data:image/png;base64,AAAA')
+    // An image tab has no text behind it, so `content` stays empty — this is
+    // what keeps a base64 blob out of the markdown pipeline and out of save().
+    expect(get(content)).toBe('')
+    expect(get(pdfDataUrl)).toBeNull()
+  })
+
+  it("keeps each tab's document separate across a switch", async () => {
+    mockRead.mockResolvedValue('# notes')
+    mockReadImage.mockResolvedValue('data:image/png;base64,BBBB')
+
+    await openTab('/a.md')
+    const textTab = get(activeTabId)!
+    await openTab('/pics/shot.png')
+
+    expect(get(imageDataUrl)).toBe('data:image/png;base64,BBBB')
+    expect(get(content)).toBe('')
+
+    await switchToTab(textTab)
+
+    // Switching back restores the text and drops the image view — the stores
+    // are views of the active tab, so neither can linger.
+    expect(get(content)).toBe('# notes')
+    expect(get(imageDataUrl)).toBeNull()
+  })
+
+  it('reports a failed image read without opening a broken tab', async () => {
+    mockReadImage.mockRejectedValue('not an image file')
+
+    await openTab('/pics/bad.png')
+
+    expect(get(tabs)).toEqual([])
+    expect(get(statusMsg)).toContain('Could not open file')
   })
 })
