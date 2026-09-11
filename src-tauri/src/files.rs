@@ -1,69 +1,5 @@
 use std::path::{Path, PathBuf};
 
-/// Whether `path`'s file name is a dotfile (hidden on Unix-like systems, and
-/// conventionally treated the same way in Explorer-style file browsers).
-fn is_hidden(path: &Path) -> bool {
-    path.file_name()
-        .and_then(|n| n.to_str())
-        .map(|n| n.starts_with('.'))
-        .unwrap_or(false)
-}
-
-/// Shared directory scan for the file-listing functions below: files only,
-/// matching `exts`, optionally skipping dotfiles, sorted by name.
-fn files_with_extensions_in(
-    dir: &Path,
-    exts: &[&str],
-    show_hidden: bool,
-) -> std::io::Result<Vec<PathBuf>> {
-    let mut out: Vec<PathBuf> = Vec::new();
-    for entry in std::fs::read_dir(dir)? {
-        let path = entry?.path();
-        if !path.is_file() {
-            continue;
-        }
-        if !show_hidden && is_hidden(&path) {
-            continue;
-        }
-        if has_extension(&path, exts) {
-            out.push(path);
-        }
-    }
-    out.sort_by_key(|p| p.file_name().map(|n| n.to_ascii_lowercase()));
-    Ok(out)
-}
-
-/// Return absolute paths of `.md`/`.markdown` files directly in `dir`, sorted
-/// by file name. Dotfiles are skipped unless `show_hidden` is set.
-pub fn markdown_files_in(dir: &Path, show_hidden: bool) -> std::io::Result<Vec<PathBuf>> {
-    files_with_extensions_in(dir, MD_EXTENSIONS, show_hidden)
-}
-
-/// Return absolute paths of all recognized text/code files directly in
-/// `dir` (a superset of `MD_EXTENSIONS`) — the listing used when "Markdown
-/// only" mode is off. Dotfiles are skipped unless `show_hidden` is set.
-pub fn text_files_in(dir: &Path, show_hidden: bool) -> std::io::Result<Vec<PathBuf>> {
-    files_with_extensions_in(dir, TEXT_EXTENSIONS, show_hidden)
-}
-
-/// Return absolute paths of immediate subdirectories of `dir`, sorted by
-/// name. Dotfiles (e.g. `.git`) are skipped unless `show_hidden` is set.
-pub fn subfolders_in(dir: &Path, show_hidden: bool) -> std::io::Result<Vec<PathBuf>> {
-    let mut out: Vec<PathBuf> = Vec::new();
-    for entry in std::fs::read_dir(dir)? {
-        let path = entry?.path();
-        if !path.is_dir() {
-            continue;
-        }
-        if !show_hidden && is_hidden(&path) {
-            continue;
-        }
-        out.push(path);
-    }
-    out.sort_by_key(|p| p.file_name().map(|n| n.to_ascii_lowercase()));
-    Ok(out)
-}
-
 /// Join `href` onto `base_file`'s parent dir and canonicalize, but only if the
 /// result exists as a file. Shared groundwork for the link/image resolvers below.
 fn resolve_relative_existing(base_file: &Path, href: &str) -> Option<PathBuf> {
@@ -77,14 +13,14 @@ fn resolve_relative_existing(base_file: &Path, href: &str) -> Option<PathBuf> {
     }
 }
 
-fn has_extension(path: &Path, exts: &[&str]) -> bool {
+pub(crate) fn has_extension(path: &Path, exts: &[&str]) -> bool {
     path.extension()
         .and_then(|e| e.to_str())
         .map(|e| exts.contains(&e.to_ascii_lowercase().as_str()))
         .unwrap_or(false)
 }
 
-const MD_EXTENSIONS: &[&str] = &["md", "markdown"];
+pub(crate) const MD_EXTENSIONS: &[&str] = &["md", "markdown"];
 
 /// Extensions treated as viewable/editable "text" files when Markdown-only
 /// mode is off. A deliberately broad but non-exhaustive allow-list of plain
@@ -115,6 +51,13 @@ pub fn is_pdf(path: &Path) -> bool {
     has_extension(path, PDF_EXTENSIONS)
 }
 
+/// Whether `path` has a recognized image extension. Like PDF, an image is
+/// opened by its own viewer rather than `read_file` — see
+/// `read_image_as_data_url` in `lib.rs`.
+pub fn is_image(path: &Path) -> bool {
+    has_extension(path, IMAGE_EXTENSIONS)
+}
+
 /// Whether `path` has an extension this app can be launched to open — via OS
 /// file-association double-click/"Open With" (macOS Apple Events, Windows
 /// CLI arg). Markdown loads as an editable tab, PDF as a read-only viewer
@@ -123,14 +66,6 @@ pub fn is_pdf(path: &Path) -> bool {
 /// only these same two.
 pub fn is_launch_openable(path: &Path) -> bool {
     has_extension(path, MD_EXTENSIONS) || is_pdf(path)
-}
-
-/// Return absolute paths of PDF files directly in `dir`, sorted by file name
-/// — listed alongside `text_files_in` when Markdown-only mode is off (PDF is
-/// part of the same "non-markdown" browsing surface, just not text). Dotfiles
-/// are skipped unless `show_hidden` is set.
-pub fn pdf_files_in(dir: &Path, show_hidden: bool) -> std::io::Result<Vec<PathBuf>> {
-    files_with_extensions_in(dir, PDF_EXTENSIONS, show_hidden)
 }
 
 /// Resolve a relative link `href` (from a markdown file at `base_file`) to an
@@ -244,104 +179,6 @@ fn parse_header(css: &str, key: &str) -> Option<String> {
 mod tests {
     use super::*;
     use std::fs;
-
-    #[test]
-    fn lists_only_markdown_sorted() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("b.md"), "x").unwrap();
-        fs::write(dir.path().join("a.MD"), "x").unwrap();
-        fs::write(dir.path().join("note.markdown"), "x").unwrap();
-        fs::write(dir.path().join("ignore.txt"), "x").unwrap();
-        fs::create_dir(dir.path().join("subdir")).unwrap();
-
-        let files = markdown_files_in(dir.path(), false).unwrap();
-        let names: Vec<String> = files
-            .iter()
-            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
-            .collect();
-        assert_eq!(names, vec!["a.MD", "b.md", "note.markdown"]);
-    }
-
-    #[test]
-    fn lists_only_visible_subdirs_sorted() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::create_dir(dir.path().join("Zeta")).unwrap();
-        fs::create_dir(dir.path().join("alpha")).unwrap();
-        fs::create_dir(dir.path().join(".git")).unwrap();
-        fs::write(dir.path().join("note.md"), "x").unwrap();
-
-        let dirs = subfolders_in(dir.path(), false).unwrap();
-        let names: Vec<String> = dirs
-            .iter()
-            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
-            .collect();
-        assert_eq!(names, vec!["alpha", "Zeta"]);
-    }
-
-    #[test]
-    fn show_hidden_reveals_dotfiles_and_dotdirs() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::create_dir(dir.path().join(".git")).unwrap();
-        fs::write(dir.path().join(".env"), "x").unwrap();
-        fs::write(dir.path().join(".hidden.md"), "x").unwrap();
-        fs::write(dir.path().join("visible.md"), "x").unwrap();
-
-        let dirs = subfolders_in(dir.path(), true).unwrap();
-        assert_eq!(dirs.len(), 1);
-        assert_eq!(dirs[0].file_name().unwrap(), ".git");
-
-        let md = markdown_files_in(dir.path(), true).unwrap();
-        let names: Vec<String> = md
-            .iter()
-            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
-            .collect();
-        assert_eq!(names, vec![".hidden.md", "visible.md"]);
-    }
-
-    #[test]
-    fn lists_broad_text_extensions_sorted() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("notes.md"), "x").unwrap();
-        fs::write(dir.path().join("main.rs"), "x").unwrap();
-        fs::write(dir.path().join("config.YAML"), "x").unwrap();
-        fs::write(dir.path().join("data.json"), "x").unwrap();
-        fs::write(dir.path().join("photo.png"), "x").unwrap();
-        fs::write(dir.path().join(".hidden.txt"), "x").unwrap();
-
-        let text = text_files_in(dir.path(), false).unwrap();
-        let names: Vec<String> = text
-            .iter()
-            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
-            .collect();
-        assert_eq!(names, vec!["config.YAML", "data.json", "main.rs", "notes.md"]);
-
-        let with_hidden = text_files_in(dir.path(), true).unwrap();
-        assert_eq!(with_hidden.len(), 5);
-    }
-
-    #[test]
-    fn lists_pdf_files_sorted_separately_from_text() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("report.PDF"), "x").unwrap();
-        fs::write(dir.path().join("appendix.pdf"), "x").unwrap();
-        fs::write(dir.path().join("notes.md"), "x").unwrap();
-        fs::write(dir.path().join(".hidden.pdf"), "x").unwrap();
-
-        let pdfs = pdf_files_in(dir.path(), false).unwrap();
-        let names: Vec<String> = pdfs
-            .iter()
-            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
-            .collect();
-        assert_eq!(names, vec!["appendix.pdf", "report.PDF"]);
-
-        // text_files_in doesn't pick up pdfs — they're listed separately and
-        // merged by the caller (list_text_files in lib.rs).
-        let text = text_files_in(dir.path(), false).unwrap();
-        assert!(text.iter().all(|p| !is_pdf(p)));
-
-        let with_hidden = pdf_files_in(dir.path(), true).unwrap();
-        assert_eq!(with_hidden.len(), 3);
-    }
 
     #[test]
     fn is_pdf_checks_extension_case_insensitively() {
@@ -462,5 +299,15 @@ mod tests {
     fn new_window_url_encodes_path() {
         let got = new_window_url_path(Some("/Users/me/My Notes/a b.md"));
         assert_eq!(got, "index.html?open=%2FUsers%2Fme%2FMy+Notes%2Fa+b.md");
+    }
+
+    #[test]
+    fn is_image_checks_extension_case_insensitively() {
+        assert!(is_image(Path::new("a.png")));
+        assert!(is_image(Path::new("A.JPEG")));
+        assert!(is_image(Path::new("logo.svg")));
+        assert!(!is_image(Path::new("a.pdf")));
+        assert!(!is_image(Path::new("a.md")));
+        assert!(!is_image(Path::new("noext")));
     }
 }

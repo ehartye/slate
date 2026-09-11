@@ -18,10 +18,10 @@
 import { get } from 'svelte/store'
 import {
   tabs, activeTabId, currentFile, dirty, editorScroll, reloadTrigger, statusMsg,
-  setTabText, setTabPdf, dropTabDoc, hasTabDoc, type Tab,
+  setTabText, setTabPdf, setTabImage, dropTabDoc, hasTabDoc, type Tab,
 } from './stores'
-import { readFile, readPdfAsDataUrl } from './tauri'
-import { isPdfPath } from './fileKind'
+import { readFile, readPdfAsDataUrl, readImageAsDataUrl } from './tauri'
+import { isPdfPath, isViewerPath } from './fileKind'
 
 let counter = 0
 /** A unique-enough id for the lifetime of the app; tabs aren't persisted. */
@@ -62,18 +62,19 @@ export async function openTab(path: string): Promise<void> {
 
   const tab: Tab = { id: nextTabId(), path, dirty: false, scrollFraction: 0, needsReload: false }
 
-  if (isPdfPath(path)) {
+  if (isViewerPath(path)) {
+    const isPdf = isPdfPath(path)
     let dataUrl: string
     try {
-      dataUrl = await readPdfAsDataUrl(path)
+      dataUrl = await (isPdf ? readPdfAsDataUrl(path) : readImageAsDataUrl(path))
     } catch (e) {
       statusMsg.set(`Could not open file: ${e}`)
       return
     }
     captureActiveTabState()
-    // The document goes in before the tab is activated, so `pdfDataUrl` is
-    // never briefly empty for a tab that in fact has content.
-    setTabPdf(tab.id, dataUrl)
+    // The document goes in before the tab is activated, so `pdfDataUrl` /
+    // `imageDataUrl` is never briefly empty for a tab that in fact has content.
+    ;(isPdf ? setTabPdf : setTabImage)(tab.id, dataUrl)
     tabs.update((ts) => [...ts, tab])
     activeTabId.set(tab.id)
     currentFile.set(path)
@@ -104,7 +105,7 @@ export async function switchToTab(id: string): Promise<void> {
   if (id === get(activeTabId)) return
   const target = get(tabs).find((t) => t.id === id)
   if (!target) return
-  const isPdf = isPdfPath(target.path)
+  const isViewer = isViewerPath(target.path)
 
   captureActiveTabState()
   // This *is* the document swap: `content` and `pdfDataUrl` are views of the
@@ -114,7 +115,7 @@ export async function switchToTab(id: string): Promise<void> {
   activeTabId.set(id)
   currentFile.set(target.path)
   dirty.set(target.dirty)
-  if (!isPdf) editorScroll.set(target.scrollFraction)
+  if (!isViewer) editorScroll.set(target.scrollFraction)
 
   // Defensively treat a missing document like a stale one: falling through
   // with nothing loaded would show (and, for a text tab, let save() write) an
@@ -127,8 +128,10 @@ export async function switchToTab(id: string): Promise<void> {
   }
 
   try {
-    if (isPdf) {
-      setTabPdf(id, await readPdfAsDataUrl(target.path))
+    if (isViewer) {
+      const isPdf = isPdfPath(target.path)
+      const dataUrl = await (isPdf ? readPdfAsDataUrl(target.path) : readImageAsDataUrl(target.path))
+      ;(isPdf ? setTabPdf : setTabImage)(id, dataUrl)
     } else {
       setTabText(id, await readFile(target.path))
       // Editor.svelte may already have built this tab's editor state from the

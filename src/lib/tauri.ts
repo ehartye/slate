@@ -42,3 +42,8 @@ export const dirName = (path: string) => {
   const m = path.match(/^(.*)[\\/][^\\/]*$/)
   return m ? m[1] : null
 }
+
+/** Read an image file as a `data:` URL for an image tab — the image
+ *  counterpart of readPdfAsDataUrl. */
+export const readImageAsDataUrl = (path: string) =>
+  invoke<string>('read_image_as_data_url', { path })

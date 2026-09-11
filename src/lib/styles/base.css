@@ -184,17 +184,17 @@ body { font-family: var(--ui-font); color: var(--fg); background: var(--bg); }
 
 /* ── PDF viewer ─────────────────────────────────────────── */
 .pdf-viewer { display: flex; flex-direction: column; height: 100%; }
-.pdf-toolbar { display: flex; align-items: center; justify-content: space-between; flex: 0 0 auto;
+.pdf-toolbar, .img-toolbar { display: flex; align-items: center; justify-content: space-between; flex: 0 0 auto;
   padding: 6px 10px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); gap: 8px; }
-.pdf-toolbar-group { display: inline-flex; align-items: center; gap: 8px; }
-.pdf-pagenav, .pdf-zoom, .pdf-fit { display: inline-flex; align-items: center; gap: 2px; }
-.pdf-btn { background: none; border: 1px solid var(--border); color: var(--fg-muted);
+.pdf-toolbar-group, .img-toolbar-group { display: inline-flex; align-items: center; gap: 8px; }
+.pdf-pagenav, .pdf-zoom, .pdf-fit, .img-zoom, .img-fit { display: inline-flex; align-items: center; gap: 2px; }
+.pdf-btn, .img-btn { background: none; border: 1px solid var(--border); color: var(--fg-muted);
   font: inherit; cursor: pointer; border-radius: 5px; padding: 1px 8px; line-height: 1.5; }
-.pdf-btn:hover { color: var(--fg); border-color: var(--accent); }
-.pdf-btn:disabled { opacity: 0.35; cursor: default; }
-.pdf-btn:disabled:hover { color: var(--fg-muted); border-color: var(--border); }
-.pdf-btn.active { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
-.pdf-zoom-level { min-width: 46px; text-align: center; border-color: transparent; }
+.pdf-btn:hover, .img-btn:hover { color: var(--fg); border-color: var(--accent); }
+.pdf-btn:disabled, .img-btn:disabled { opacity: 0.35; cursor: default; }
+.pdf-btn:disabled:hover, .img-btn:disabled:hover { color: var(--fg-muted); border-color: var(--border); }
+.pdf-btn.active, .img-btn.active { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.pdf-zoom-level, .img-zoom-level { min-width: 46px; text-align: center; border-color: transparent; }
 .pdf-page-indicator { color: var(--fg-muted); font-size: 12px; min-width: 64px; text-align: center; }
 .pdf-body { flex: 1; min-height: 0; display: flex; }
 .pdf-outline-panel { flex: 0 0 220px; overflow: auto; padding: 10px 6px; background: var(--bg-elevated);
@@ -271,3 +271,19 @@ mark.find-hit-active { background: var(--accent); color: var(--bg); }
 }
 .statusbar .zoom-level { min-width: 42px; text-align: center; border-color: transparent; }
 .statusbar .zoom-btn:hover, .statusbar .zoom-level:hover { color: var(--fg); border-color: var(--accent); }
+
+/* ── Image viewer ───────────────────────────────────────── */
+/* Chrome (toolbar, buttons, zoom readout) is shared with the PDF viewer
+   above — the two are the same kind of surface, so they read as one. Only
+   the body differs: a single centred image rather than a page column. */
+.img-viewer { display: flex; flex-direction: column; height: 100%; }
+.img-body { flex: 1; min-height: 0; overflow: auto; display: flex;
+  align-items: flex-start; justify-content: flex-start; padding: 18px; background: var(--bg); }
+/* Fitted: centre it and let CSS do the scaling. Zoomed: the image can exceed
+   the viewport, so it anchors top-left and the container scrolls instead. */
+.img-body.fitted { align-items: center; justify-content: center; overflow: hidden; }
+.img-canvas { display: block; flex: 0 0 auto; box-shadow: var(--shadow); background: var(--bg-elevated); }
+.img-body.fitted .img-canvas { max-width: 100%; max-height: 100%; object-fit: contain; }
+.img-dims { color: var(--fg-muted); font-size: 12px; }
+.img-status, .img-error { padding: 40px 28px; color: var(--fg-muted); font-size: 14px; }
+.img-error { color: var(--accent); }

@@ -27,6 +27,7 @@ export const activeTabId = writable<string | null>(null)
 export type TabDoc =
   | { kind: 'text'; text: string }
   | { kind: 'pdf'; dataUrl: string }
+  | { kind: 'image'; dataUrl: string }
 
 /** Every open tab's document, keyed by tab id — the single source of truth for
  *  document bytes, and the reason `content` below can't drift out of sync with
@@ -61,6 +62,10 @@ export function setTabPdf(id: string, dataUrl: string): void {
   mutateDocs((docs) => { docs.set(id, { kind: 'pdf', dataUrl }) })
 }
 
+export function setTabImage(id: string, dataUrl: string): void {
+  mutateDocs((docs) => { docs.set(id, { kind: 'image', dataUrl }) })
+}
+
 /** Forget a closed tab's document, so closing tabs doesn't leak them. */
 export function dropTabDoc(id: string): void {
   mutateDocs((docs) => { docs.delete(id) })
@@ -84,7 +89,11 @@ export const content: Readable<string> & { set(text: string): void } = {
   set(text: string) {
     const id = get(activeTabId)
     if (!id) return // nothing open — a text write has no tab to belong to
-    if (get(tabDocs).get(id)?.kind === 'pdf') return // never clobber a PDF doc
+    // Never clobber a non-text document. Asked as "is it text?" rather than
+    // "is it a PDF?" so a newly added binary kind is protected by default.
+    // An absent doc still accepts the write — that's a tab loading its text.
+    const existing = get(tabDocs).get(id)
+    if (existing && existing.kind !== 'text') return
     setTabText(id, text)
   },
 }
@@ -94,6 +103,13 @@ export const content: Readable<string> & { set(text: string): void } = {
 export const pdfDataUrl: Readable<string | null> = derived(
   activeDoc,
   (doc) => (doc?.kind === 'pdf' ? doc.dataUrl : null),
+)
+
+/** The active tab's image as a `data:` URL, or null when the active tab isn't
+ *  an image. Same view-of-`tabDocs` arrangement as `content` and `pdfDataUrl`. */
+export const imageDataUrl: Readable<string | null> = derived(
+  activeDoc,
+  (doc) => (doc?.kind === 'image' ? doc.dataUrl : null),
 )
 
 export const dirty = writable<boolean>(false)
