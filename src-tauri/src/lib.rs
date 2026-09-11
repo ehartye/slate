@@ -1,4 +1,6 @@
 mod files;
+mod listing;
+mod text_kind;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -141,7 +143,7 @@ fn list_themes(app: tauri::AppHandle) -> Result<Vec<ThemeInfo>, String> {
 
 #[tauri::command]
 fn list_markdown_files(folder: String, show_hidden: bool) -> Result<Vec<String>, String> {
-    let paths = files::markdown_files_in(std::path::Path::new(&folder), show_hidden)
+    let paths = listing::markdown_files_in(std::path::Path::new(&folder), show_hidden)
         .map_err(|e| e.to_string())?;
     Ok(paths
         .into_iter()
@@ -156,8 +158,8 @@ fn list_markdown_files(folder: String, show_hidden: bool) -> Result<Vec<String>,
 #[tauri::command]
 fn list_text_files(folder: String, show_hidden: bool) -> Result<Vec<String>, String> {
     let dir = std::path::Path::new(&folder);
-    let mut paths = files::text_files_in(dir, show_hidden).map_err(|e| e.to_string())?;
-    paths.extend(files::pdf_files_in(dir, show_hidden).map_err(|e| e.to_string())?);
+    let mut paths = listing::text_files_in(dir, show_hidden).map_err(|e| e.to_string())?;
+    paths.extend(listing::pdf_files_in(dir, show_hidden).map_err(|e| e.to_string())?);
     paths.sort_by_key(|p| p.file_name().map(|n| n.to_ascii_lowercase()));
     Ok(paths
         .into_iter()
@@ -167,7 +169,7 @@ fn list_text_files(folder: String, show_hidden: bool) -> Result<Vec<String>, Str
 
 #[tauri::command]
 fn list_subfolders(folder: String, show_hidden: bool) -> Result<Vec<String>, String> {
-    let paths = files::subfolders_in(std::path::Path::new(&folder), show_hidden)
+    let paths = listing::subfolders_in(std::path::Path::new(&folder), show_hidden)
         .map_err(|e| e.to_string())?;
     Ok(paths
         .into_iter()
