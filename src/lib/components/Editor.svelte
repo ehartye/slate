@@ -15,6 +15,7 @@
   } from '$lib/stores'
   import { isMarkdownPath } from '$lib/fileKind'
   import { baseName } from '$lib/tauri'
+  import { languageNameFor } from '$lib/language'
 
   // Markdown source highlighting that follows the active theme via CSS variables.
   const mdHighlight = HighlightStyle.define([
@@ -149,9 +150,19 @@
    *  is currently canonical for `tabId`: the live view if it's still the
    *  active tab, or the cached background state otherwise — never blindly
    *  assumed to still be the active tab. */
+  /** language-data's filename matching, with `languageNameFor`'s overrides
+   *  consulted first — that map exists precisely for the names matchFilename
+   *  misses (every dotfile, `.svelte`) or resolves wrongly (`.cfg`), so it has
+   *  to win rather than act as a fallback. Null from both means plain text. */
+  function matchLanguage(path: string): LanguageDescription | null {
+    const override = languageNameFor(path)
+    const byName = override ? LanguageDescription.matchLanguageName(languages, override) : null
+    return byName ?? LanguageDescription.matchFilename(languages, baseName(path))
+  }
+
   async function loadLanguageFor(tabId: string, path: string) {
     if (isMarkdownPath(path) || languageResolvedFor.has(tabId)) return
-    const desc = LanguageDescription.matchFilename(languages, baseName(path))
+    const desc = matchLanguage(path)
     if (!desc) return
     const support = await desc.load()
     languageResolvedFor.add(tabId)
