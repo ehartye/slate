@@ -35,6 +35,7 @@ pub const TEXT_EXTENSIONS: &[&str] = &[
     "rs", "go", "py", "rb", "php", "java", "kt", "kts", "swift",
     "c", "h", "cpp", "cc", "hpp", "hh", "cs", "lua", "sql", "r", "scala", "pl", "pm",
     "css", "scss", "sass", "less", "html", "htm", "vue", "svelte", "graphql", "proto",
+    "cls", "trigger", "apex",
 ];
 
 /// Image extensions supported for inline preview/export. Kept in sync with

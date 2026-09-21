@@ -46,6 +46,12 @@ describe('languageFallbackFor', () => {
     expect(languageFallbackFor('App.svelte')).toBe('HTML')
   })
 
+  it('maps Salesforce Apex (.cls, .trigger, .apex) to Java', () => {
+    expect(languageFallbackFor('AccountService.cls')).toBe('Java')
+    expect(languageFallbackFor('AccountTrigger.trigger')).toBe('Java')
+    expect(languageFallbackFor('Anonymous.apex')).toBe('Java')
+  })
+
   it('is case-insensitive and accepts a full path on either separator', () => {
     expect(languageFallbackFor('.BASHRC')).toBe('Shell')
     expect(languageFallbackFor('C:\\Users\\me\\project\\.bashrc')).toBe('Shell')
@@ -95,5 +101,8 @@ describe('resolution order (the bug the split prevents)', () => {
   it('fills gaps language-data leaves', () => {
     expect(resolve('App.svelte')).toBe('HTML')
     expect(resolve('.gitignore')).toBe('Properties files')
+    expect(resolve('AccountService.cls')).toBe('Java')
+    expect(resolve('AccountTrigger.trigger')).toBe('Java')
+    expect(resolve('Anonymous.apex')).toBe('Java')
   })
 })

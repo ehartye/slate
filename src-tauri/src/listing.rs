@@ -325,11 +325,12 @@ mod tests {
 
     #[test]
     fn known_text_extension_lists_even_when_empty() {
-        // The fast path must not depend on content: an empty .rs file is still
-        // a source file the user expects to see.
+        // The fast path must not depend on content: an empty .rs or .cls file is
+        // still a source file the user expects to see.
         let dir = tempfile::tempdir().unwrap();
         fs::write(dir.path().join("empty.rs"), "").unwrap();
-        assert_eq!(names_of(&text_files_in(dir.path(), false).unwrap()), vec!["empty.rs"]);
+        fs::write(dir.path().join("empty.cls"), "").unwrap();
+        assert_eq!(names_of(&text_files_in(dir.path(), false).unwrap()), vec!["empty.cls", "empty.rs"]);
     }
 
     #[cfg(windows)]

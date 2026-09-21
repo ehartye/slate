@@ -27,6 +27,7 @@ const SHELL = 'Shell'
 const JSON_LANG = 'JSON'
 const PROPERTIES = 'Properties files'
 const HTML = 'HTML'
+const JAVA = 'Java'
 
 /** Whole filenames, lowercased. These are dotfiles with no extension to key
  *  off, so nothing but the full name identifies them. */
@@ -78,6 +79,12 @@ const BY_EXTENSION: Record<string, string> = {
   // full name — `nginx.conf` is Nginx — and those have to keep winning.
   conf: PROPERTIES,
   env: PROPERTIES,
+  // Salesforce Apex is Java-shaped (mirrors markdown.ts LANG_ALIASES):
+  // language-data ships no Apex grammar, but Java highlights classes,
+  // triggers, and anonymous scripts accurately.
+  cls: JAVA,
+  trigger: JAVA,
+  apex: JAVA,
 }
 
 /** Deliberately absent, and why: `Makefile` and `.bat`/`.cmd` have no grammar
