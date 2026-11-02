@@ -1,3 +1,4 @@
+import { mutationsFrozen } from './mutationGate'
 // Tab lifecycle: open/switch/close. Each tab remembers its own dirty state
 // and scroll fraction; the CodeMirror EditorState per tab is cached inside
 // Editor.svelte (the only place that needs it), and swapped in via
@@ -18,7 +19,7 @@
 import { get } from 'svelte/store'
 import {
   tabs, activeTabId, currentFile, dirty, editorScroll, reloadTrigger, statusMsg,
-  setTabText, setTabPdf, setTabImage, dropTabDoc, hasTabDoc, type Tab,
+  setTabText, setTabPdf, setTabImage, dropTabDoc, hasTabDoc, documentRevision, type Tab,
 } from './stores'
 import { readFile, readPdfAsDataUrl, readImageAsDataUrl } from './tauri'
 import { isPdfPath, isViewerPath } from './fileKind'
@@ -54,6 +55,7 @@ function captureActiveTabState(): void {
  *  dialog, OS file-association opens, and relative-link navigation — anywhere
  *  that previously just set `currentFile`/`content` directly. */
 export async function openTab(path: string): Promise<void> {
+  if (mutationsFrozen()) return
   const existing = findTabByPath(path)
   if (existing) {
     await switchToTab(existing.id)
@@ -71,6 +73,7 @@ export async function openTab(path: string): Promise<void> {
       statusMsg.set(`Could not open file: ${e}`)
       return
     }
+    if (mutationsFrozen()) return
     captureActiveTabState()
     // The document goes in before the tab is activated, so `pdfDataUrl` /
     // `imageDataUrl` is never briefly empty for a tab that in fact has content.
@@ -89,6 +92,7 @@ export async function openTab(path: string): Promise<void> {
     statusMsg.set(`Could not open file: ${e}`)
     return
   }
+  if (mutationsFrozen()) return
   captureActiveTabState()
   setTabText(tab.id, text)
   tabs.update((ts) => [...ts, tab])
@@ -102,6 +106,7 @@ export async function openTab(path: string): Promise<void> {
  *  if the file changed on disk while this tab was inactive (and it has no
  *  unsaved edits), reloads it from disk now. */
 export async function switchToTab(id: string): Promise<void> {
+  if (mutationsFrozen()) return
   if (id === get(activeTabId)) return
   const target = get(tabs).find((t) => t.id === id)
   if (!target) return
@@ -121,6 +126,7 @@ export async function switchToTab(id: string): Promise<void> {
   // with nothing loaded would show (and, for a text tab, let save() write) an
   // empty document.
   const stale = target.needsReload || !hasTabDoc(id)
+  const revision = documentRevision(id)
   if (!stale) return
   if (target.needsReload && target.dirty) {
     statusMsg.set('File changed on disk — save or discard changes to reload')
@@ -131,9 +137,12 @@ export async function switchToTab(id: string): Promise<void> {
     if (isViewer) {
       const isPdf = isPdfPath(target.path)
       const dataUrl = await (isPdf ? readPdfAsDataUrl(target.path) : readImageAsDataUrl(target.path))
+      if (mutationsFrozen() || !get(tabs).some(t => t.id === id)) return
       ;(isPdf ? setTabPdf : setTabImage)(id, dataUrl)
     } else {
-      setTabText(id, await readFile(target.path))
+      const text = await readFile(target.path)
+      if (mutationsFrozen() || documentRevision(id) !== revision || !get(tabs).some(t => t.id === id)) return
+      setTabText(id, text)
       // Editor.svelte may already have built this tab's editor state from the
       // pre-reload text while the read was in flight; the trigger makes it
       // resync from what's now on disk.
@@ -151,6 +160,7 @@ export async function switchToTab(id: string): Promise<void> {
 /** Close a tab. Picks the right neighbor, then the left neighbor, then no
  *  tab at all, as the next active tab — the conventional tabbed-editor rule. */
 export async function closeTab(id: string): Promise<void> {
+  if (mutationsFrozen()) return
   const current = get(tabs)
   const idx = current.findIndex((t) => t.id === id)
   if (idx === -1) return
@@ -180,6 +190,7 @@ export async function closeTab(id: string): Promise<void> {
  *  `file-changed` event's path doesn't belong to the active tab. Returns
  *  whether a background tab matched (so the caller can report it). */
 export function markBackgroundTabForReload(path: string): boolean {
+  if (mutationsFrozen()) return false
   const match = get(tabs).find((t) => t.path === path && t.id !== get(activeTabId))
   if (!match) return false
   tabs.update((ts) => ts.map((t) => (t.id === match.id ? { ...t, needsReload: true } : t)))

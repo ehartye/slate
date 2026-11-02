@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { mutationsFrozen, updateFrozen } from '$lib/mutationGate'
   import { onMount } from 'svelte'
   import { get } from 'svelte/store'
   import {
@@ -55,6 +56,7 @@
   // Compartment isn't tied to one EditorState, it's just a key identifying
   // a slot within whichever state's config it appears in).
   const langCompartment = new Compartment()
+  const updateLock = new Compartment()
   // Tab ids whose language extension has already been resolved (or that
   // didn't need resolving, being markdown) — avoids redundant repeat loads
   // if a tab is revisited, since @codemirror/language-data's dynamic
@@ -117,8 +119,10 @@
       syntaxHighlighting(mdHighlight),
       syntaxHighlighting(codeHighlight),
       EditorView.lineWrapping,
-      EditorState.readOnly.of(readOnly),
-      EditorView.editable.of(!readOnly),
+      updateLock.of([
+        EditorState.readOnly.of(readOnly || mutationsFrozen()),
+        EditorView.editable.of(!readOnly && !mutationsFrozen()),
+      ]),
       EditorView.updateListener.of((u) => {
         if (u.docChanged) {
           content.set(u.state.doc.toString())
@@ -202,7 +206,17 @@
     // A trivial placeholder — the effect below immediately swaps in the real
     // state for whichever tab is active (Editor.svelte only mounts once a
     // tab exists, so `$activeTabId` is always non-null by this point).
-    view = new EditorView({ parent: host, state: EditorState.create({ extensions: [] }) })
+    view = new EditorView({
+      parent: host,
+      state: EditorState.create({ extensions: [] }),
+      // Gate the view itself, including history transactions that intentionally
+      // bypass CodeMirror transaction filters. This is synchronous with the
+      // prepare acknowledgment; the reactive read-only styling is only UX.
+      dispatchTransactions(transactions, editor) {
+        if (mutationsFrozen() && transactions.some(tr => tr.docChanged)) return
+        editor.update(transactions)
+      },
+    })
     const onScroll = () => {
       const el = view!.scrollDOM
       const max = el.scrollHeight - el.clientHeight
@@ -259,16 +273,24 @@
       void loadLanguageFor(id, path) // no-ops if already resolved (or markdown)
     } else {
       // Same tab, external reload while it was active. Tag the transaction
-      // (see reloadAnnotation above) and re-clear `dirty` after dispatching
-      // — belt-and-suspenders so this path always leaves the tab clean,
-      // regardless of what the caller did before bumping reloadTrigger.
+      // (see reloadAnnotation above). The caller owns dirty state: clearing
+      // it in this deferred effect could clear an edit made after the reload.
       view.dispatch({
         changes: { from: 0, to: view.state.doc.length, insert: get(content) },
         annotations: reloadAnnotation.of(true),
       })
-      dirty.set(false)
       editorStates.set(id, view.state)
     }
+  })
+  $effect(() => {
+    const frozen = $updateFrozen
+    const readOnly = !isMarkdownPath($currentFile)
+    const id = $activeTabId
+    if (!view || !id || updateLock.get(view.state) === undefined) return
+    view.dispatch({ effects: updateLock.reconfigure([
+      EditorState.readOnly.of(readOnly || frozen),
+      EditorView.editable.of(!readOnly && !frozen),
+    ]) })
   })
 </script>
 

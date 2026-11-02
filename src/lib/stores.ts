@@ -1,5 +1,9 @@
 import { writable, derived, get, type Readable } from 'svelte/store'
 import type { Theme } from './theme'
+import { mutationsFrozen } from './mutationGate'
+
+const revisions = new Map<string, number>()
+export const documentRevision = (id: string) => revisions.get(id) ?? 0
 
 export const currentFolder = writable<string | null>(null)
 export const files = writable<string[]>([])          // full paths
@@ -55,19 +59,25 @@ function mutateDocs(fn: (docs: Map<string, TabDoc>) => void): void {
 }
 
 export function setTabText(id: string, text: string): void {
+  if (mutationsFrozen()) return
+  revisions.set(id, documentRevision(id) + 1)
   mutateDocs((docs) => { docs.set(id, { kind: 'text', text }) })
 }
 
 export function setTabPdf(id: string, dataUrl: string): void {
+  if (mutationsFrozen()) return
   mutateDocs((docs) => { docs.set(id, { kind: 'pdf', dataUrl }) })
 }
 
 export function setTabImage(id: string, dataUrl: string): void {
+  if (mutationsFrozen()) return
   mutateDocs((docs) => { docs.set(id, { kind: 'image', dataUrl }) })
 }
 
 /** Forget a closed tab's document, so closing tabs doesn't leak them. */
 export function dropTabDoc(id: string): void {
+  if (mutationsFrozen()) return
+  revisions.delete(id)
   mutateDocs((docs) => { docs.delete(id) })
 }
 
