@@ -1,5 +1,14 @@
 import { invoke } from '@tauri-apps/api/core'
 
+export interface BuildInfo {
+  version: string
+  commit: string | null
+  trackedState: 'clean' | 'modified' | 'unknown'
+}
+
+/** Immutable source provenance compiled into the native application. */
+export const getBuildInfo = () => invoke<BuildInfo>('get_build_info')
+
 export const listMarkdownFiles = (folder: string, showHidden: boolean) =>
   invoke<string[]>('list_markdown_files', { folder, showHidden })
 

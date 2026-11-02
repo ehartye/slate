@@ -1,3 +1,4 @@
+mod build_info;
 mod files;
 mod listing;
 mod text_kind;
@@ -423,6 +424,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            build_info::get_build_info,
             list_markdown_files,
             list_text_files,
             list_subfolders,

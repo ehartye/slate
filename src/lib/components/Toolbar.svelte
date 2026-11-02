@@ -15,8 +15,10 @@
   import { inlineLocalImages } from '$lib/images'
   import { isViewerPath } from '$lib/fileKind'
   import ThemePanel from './ThemePanel.svelte'
+  import AboutDialog from './AboutDialog.svelte'
 
   let panelOpen = $state(false)
+  let aboutOpen = $state(false)
   // Exporting a PDF tab's ($content is empty/inert for those — see tabs.ts)
   // rendered-as-markdown HTML would be meaningless; the button is disabled
   // instead, rather than silently producing a blank export.
@@ -108,6 +110,14 @@
 
   <span class="spacer"></span>
 
+  <button class="browser-btn" title="About Slate" aria-label="About Slate"
+    onclick={() => { panelOpen = false; aboutOpen = true }}>
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+      <circle cx="8" cy="8" r="6.5" stroke-width="1.5" />
+      <path d="M8 7v5M8 4v1" stroke-width="1.5" />
+    </svg>
+  </button>
+
   <button
     class="browser-btn"
     class:off={!$mdOnlyMode}
@@ -157,4 +167,7 @@
 
 {#if panelOpen}
   <ThemePanel onclose={() => (panelOpen = false)} />
+{/if}
+{#if aboutOpen}
+  <AboutDialog onclose={() => (aboutOpen = false)} />
 {/if}
