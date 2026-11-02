@@ -35,11 +35,11 @@ There is no lint step configured. `npm run check` is the typecheck gate.
 npm run tauri build -- --bundles nsis    # Windows installer -> src-tauri/target/release/bundle/nsis/
 ```
 
-The version lives in **three** files that must be bumped together: `src-tauri/tauri.conf.json`, `package.json`, and `src-tauri/Cargo.toml`. `tauri.conf.json` is the one that actually matters — it overrides Cargo's version for the bundle, and it's what ends up in the installer filename, the Add/Remove Programs entry, and the uninstall registry key. The other two are kept in sync so nothing reads a stale number, not because the bundler consults them.
+Local builds and local installs preserve the checked-in application version. They do not require a version bump, tag, commit, push, or clean working tree, and build tooling must not rewrite tracked manifests, lockfiles, or generated identity files.
 
-**Bump the `-dev.N` suffix every time you build an installer to install locally.** The registry and Add/Remove Programs record only the version string, so two installs built from different commits at the same version are indistinguishable there — the sole evidence of which build is actually on the machine is the `.exe` file timestamp, which nobody thinks to check. Installing over an identical version also gives you no signal that the upgrade took. Released builds drop the suffix (`0.1.0`); dev builds carry it (`0.1.0-dev.1`, `0.1.0-dev.2`, …), which also sorts them *below* the release in semver, so a stale dev install never looks newer than a real one.
+For an intentional release or prerelease, synchronize the chosen version in `src-tauri/tauri.conf.json`, `package.json`, and `src-tauri/Cargo.toml`, plus the root package records in `package-lock.json` and `src-tauri/Cargo.lock`. The explicit Tauri configuration supplies the effective application version; the other manifests and lockfiles stay consistent with it. Published release versions are immutable: changed distributed artifacts require a new release version. No next release version is selected by this policy.
 
-This is a manual convention with a manual failure mode — forget the bump and you're back to indistinguishable installs. If that starts biting, the fix is a script that stamps the suffix from `git rev-parse --short HEAD` at build time rather than a hand-edited number; it wasn't worth the machinery yet.
+Keep application version and source identification separate. The About dialog exposes the compiled full Git commit and tracked-change state without putting a SHA into the application version. These identify source provenance, not an exact binary: modified state does not identify the patch, and clean state excludes untracked inputs, dependency differences, and toolchain differences.
 
 ## Architecture
 
