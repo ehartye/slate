@@ -1,6 +1,6 @@
 [package]
 name = "slate"
-version = "0.1.0-dev.6"
+version = "0.2.0-alpha.1"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -26,6 +26,12 @@ tauri-plugin-dialog = "2.7.1"
 url = "2"
 notify-debouncer-mini = "0.4"
 base64 = "0.22"
+tauri-plugin-updater = "2"
+tauri-plugin-single-instance = "2"
+semver = "1"
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+tokio = { version = "1", features = ["time"] }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.61", features = [
@@ -36,4 +42,7 @@ windows = { version = "0.61", features = [
 
 [dev-dependencies]
 tempfile = "3"
+
+[features]
+updater-verification = []
 

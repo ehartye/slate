@@ -1,3 +1,5 @@
+mod update_guard;
+mod updates;
 mod build_info;
 mod files;
 mod listing;
@@ -17,6 +19,7 @@ use tauri_plugin_opener::OpenerExt;
 
 struct OpenedFile(Mutex<Option<String>>);
 
+
 /// File-watch state shared across the whole app. A single window can have
 /// several tabs open (each watching its own file), and the same file can be
 /// open in tabs across multiple windows — so watchers are refcounted per
@@ -29,10 +32,6 @@ struct FileWatchState {
 }
 struct FileWatchers(Mutex<FileWatchState>);
 
-/// Whether the first macOS `RunEvent::Opened` (the file that launched the
-/// process, if any) has already been handled. Later opens, while the app is
-/// already running, spawn a new window instead of hijacking an existing one.
-struct FirstOpenHandled(Mutex<bool>);
 
 /// Labels new windows uniquely for the lifetime of the process ("main" is
 /// reserved for the initial window declared in `tauri.conf.json`).
@@ -247,18 +246,10 @@ fn read_pdf_as_data_url(path: String) -> Result<String, String> {
 /// args on Windows. Consumes the stored macOS value so it's only ever
 /// delivered to one window.
 #[tauri::command]
-fn get_startup_file(state: tauri::State<OpenedFile>) -> Option<String> {
-    // macOS: file delivered via Apple Events, stored in managed state
-    if let Ok(mut guard) = state.0.lock() {
-        if guard.is_some() {
-            return guard.take();
-        }
-    }
-    // Windows: file delivered as a CLI argument
-    std::env::args().skip(1).find(|a| {
-        let p = std::path::Path::new(a);
-        p.is_file() && files::is_launch_openable(p)
-    })
+fn get_startup_file(window: tauri::Window, state: tauri::State<OpenedFile>) -> Option<String> {
+    if window.label() != "main" { return None; }
+    if let Some(path) = state.0.lock().ok()?.take() { return Some(path); }
+    startup_path(window.label(), &std::env::args().collect::<Vec<_>>(), &std::env::current_dir().ok()?.to_string_lossy())
 }
 
 /// Decrement `path`'s refcount, removing (and thus dropping/stopping) its
@@ -352,7 +343,9 @@ fn unwatch_file(
 }
 
 #[tauri::command]
-fn write_file(path: String, content: String) -> Result<(), String> {
+fn write_file(state: tauri::State<updates::Updates>, path: String, content: String) -> Result<(), String> {
+    let service = state.0.lock().map_err(|e| e.to_string())?;
+    if service.guard.frozen() { return Err("Update installation in progress".into()); }
     std::fs::write(&path, content).map_err(|e| e.to_string())
 }
 
@@ -382,6 +375,17 @@ fn open_in_browser(app: tauri::AppHandle, html: String) -> Result<(), String> {
 /// (size/title/etc.) with a fresh label, so multiple independent instances
 /// can be open at once. `open_path`, if given, loads that file on mount.
 fn spawn_window(app: &tauri::AppHandle, open_path: Option<&str>) -> Result<(), String> {
+    let state = app.state::<updates::Updates>();
+    let mut service = state.0.lock().map_err(|e| e.to_string())?;
+    if !service.reserve_open(open_path.map(String::from))? { return Ok(()); }
+    drop(service);
+    spawn_reserved_window(app, open_path)
+}
+
+/// Caller has already reserved this creation under the update coordinator lock.
+fn spawn_reserved_window(app: &tauri::AppHandle, open_path: Option<&str>) -> Result<(), String> {
+    let state = app.state::<updates::Updates>();
+    let result = (|| {
     let n = WINDOW_COUNTER.fetch_add(1, Ordering::SeqCst);
     let label = format!("slate-{n}");
     let mut conf = app
@@ -400,6 +404,9 @@ fn spawn_window(app: &tauri::AppHandle, open_path: Option<&str>) -> Result<(), S
         .build()
         .map_err(|e| e.to_string())?;
     Ok(())
+    })();
+    state.0.lock().map_err(|e| e.to_string())?.opening_windows -= 1;
+    result
 }
 
 /// Open a new, independent Slate window (blank — no folder/file pre-selected).
@@ -411,20 +418,31 @@ async fn open_new_window(app: tauri::AppHandle) -> Result<(), String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
+            let path = forwarded_path(&args, &cwd);
+            let _ = spawn_window(app, path.as_deref());
+        }))
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .manage(updates::Updates::default())
         .manage(OpenedFile(Mutex::new(None)))
         .manage(FileWatchers(Mutex::new(FileWatchState {
             watchers: HashMap::new(),
             by_window: HashMap::new(),
         })))
-        .manage(FirstOpenHandled(Mutex::new(false)))
         .setup(|app| {
+            updates::validate_configuration(app.handle())?;
             seed_themes(&app.handle()).map_err(|e| e.to_string())?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             build_info::get_build_info,
+            updates::get_update_status,
+            updates::check_for_updates,
+            updates::download_update,
+            updates::install_update,
+            updates::ack_update_safety,
             list_markdown_files,
             list_text_files,
             list_subfolders,
@@ -446,6 +464,14 @@ pub fn run() {
         // `FileWatchers` doesn't accumulate stale entries as windows come
         // and go (each path's refcount is unwound, not just cleared).
         .on_window_event(|window, event| {
+            if let Some(state) = window.try_state::<updates::Updates>() {
+                if let Ok(mut service) = state.0.lock() {
+                    if service.guard.preparing && matches!(event, tauri::WindowEvent::Destroyed) { service.guard.failed = true; }
+                    if service.guard.frozen() {
+                        if let tauri::WindowEvent::CloseRequested { api, .. } = event { api.prevent_close(); }
+                    }
+                }
+            }
             if let tauri::WindowEvent::Destroyed = event {
                 if let Some(state) = window.try_state::<FileWatchers>() {
                     if let Ok(mut st) = state.0.lock() {
@@ -460,14 +486,17 @@ pub fn run() {
         })
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
-        .run(|app, event| {
+        .run(|_app, _event| {
+            if let tauri::RunEvent::ExitRequested { code, api, .. } = &_event {
+                if _app.state::<updates::Updates>().0.lock().unwrap().should_prevent_exit(*code) {
+                    api.prevent_exit();
+                }
+            }
             // macOS delivers file-association opens via Apple Events, not CLI args.
-            // The first one (if any) is the file that launched the process, so it's
-            // routed into the pre-existing `main` window the same way as before.
-            // Any later one means the app was already running — that gets its own
-            // new window instead of hijacking whatever's already open.
+            // Preserve initial Finder routing; subsequent events open an
+            // independent window, and all requests respect the update guard.
             #[cfg(any(target_os = "macos", target_os = "ios"))]
-            if let tauri::RunEvent::Opened { urls } = &event {
+            if let tauri::RunEvent::Opened { urls } = &_event {
                 let path = urls.iter().find_map(|url| {
                     url.to_file_path().ok().and_then(|p| {
                         if p.is_file() && files::is_launch_openable(&p) {
@@ -478,21 +507,47 @@ pub fn run() {
                     })
                 });
                 if let Some(ref path_str) = path {
-                    if let Ok(mut first) = app.state::<FirstOpenHandled>().0.lock() {
-                        if !*first {
-                            *first = true;
-                            if let Some(state) = app.try_state::<OpenedFile>() {
-                                if let Ok(mut guard) = state.0.lock() {
-                                    *guard = Some(path_str.clone());
-                                }
-                            }
-                            let _ = app.emit_to("main", "open-file", path_str.clone());
-                        } else {
-                            drop(first);
-                            let _ = spawn_window(app, Some(path_str));
-                        }
+                    let state = _app.state::<updates::Updates>();
+                    let mut service = state.0.lock().unwrap();
+                    if !service.initial_open_handled && !service.guard.frozen() {
+                        service.initial_open_handled = true;
+                        *_app.state::<OpenedFile>().0.lock().unwrap() = Some(path_str.clone());
+                        let _ = _app.emit_to("main", "open-file", path_str.clone());
+                    } else {
+                        service.initial_open_handled = true;
+                        drop(service);
+                        let _ = spawn_window(_app, Some(path_str));
                     }
                 }
             }
         });
+}
+
+fn forwarded_path(args: &[String], cwd: &str) -> Option<String> {
+    args.iter().skip(1).find_map(|arg| {
+        let p = PathBuf::from(arg);
+        let p = if p.is_absolute() { p } else { PathBuf::from(cwd).join(p) };
+        (p.is_file() && files::is_launch_openable(&p)).then(|| p.to_string_lossy().to_string())
+    })
+}
+
+#[cfg(test)]
+mod launch_tests {
+    use super::*;
+    #[test]
+    fn forwarded_relative_file_is_new_window_input_and_blank_launch_stays_blank() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("note.md"), "content").unwrap();
+        let cwd = dir.path().to_str().unwrap();
+        let args = vec!["Slate".into(), "note.md".into()];
+        assert!(forwarded_path(&args, cwd).unwrap().ends_with("note.md"));
+        assert!(forwarded_path(&["Slate".into()], cwd).is_none());
+        assert!(startup_path("slate-1", &args, cwd).is_none());
+        assert!(startup_path("main", &args, cwd).is_some());
+    }
+}
+
+fn startup_path(label: &str, args: &[String], cwd: &str) -> Option<String> {
+    if label != "main" { return None; }
+    forwarded_path(args, cwd)
 }

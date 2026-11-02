@@ -1,0 +1,141 @@
+name: Preview release
+
+on:
+  push:
+    tags: ['v*-alpha.*']
+
+permissions:
+  contents: read
+
+env:
+  RUST_TOOLCHAIN: '1.97.1'
+
+jobs:
+  windows:
+    if: github.repository == 'ehartye/slate'
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate trusted tag
+        shell: bash
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+          node scripts/validate-release.mjs --tag "$GITHUB_REF_NAME"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '26'
+          cache: npm
+      - run: npm ci
+      - name: Prepare Rust
+        shell: bash
+        run: |
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal
+          rustup default "$RUST_TOOLCHAIN"
+      - name: Verify signing key and prepare release overlay
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          node scripts/check-updater-key.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/prepare-release-config.mjs --output "$env:RUNNER_TEMP/release.json"
+      - name: Build Windows installer
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          npm run tauri build -- --bundles nsis --config "$env:RUNNER_TEMP/release.json" -- --locked
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/validate-release.mjs --tag "$env:GITHUB_REF_NAME"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git diff --exit-code -- package.json package-lock.json src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/tauri.conf.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          New-Item -ItemType Directory -Path release-assets | Out-Null
+          Copy-Item src-tauri/target/release/bundle/nsis/*.exe release-assets/
+          Copy-Item src-tauri/target/release/bundle/nsis/*.exe.sig release-assets/
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: preview-windows
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 7
+
+  macos:
+    if: github.repository == 'ehartye/slate'
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate trusted tag
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+          node scripts/validate-release.mjs --tag "$GITHUB_REF_NAME"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '26'
+          cache: npm
+      - run: npm ci
+      - name: Prepare Rust
+        run: |
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --target x86_64-apple-darwin,aarch64-apple-darwin
+          rustup default "$RUST_TOOLCHAIN"
+      - name: Verify signing key and prepare release overlay
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          node scripts/check-updater-key.mjs
+          node scripts/prepare-release-config.mjs --output "$RUNNER_TEMP/release.json"
+      - name: Build universal Mac installers
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          npm run tauri build -- --target universal-apple-darwin --bundles app,dmg --config "$RUNNER_TEMP/release.json" -- --locked
+          lipo -verify_arch x86_64 arm64 src-tauri/target/universal-apple-darwin/release/bundle/macos/Slate.app/Contents/MacOS/Slate
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' src-tauri/target/universal-apple-darwin/release/bundle/macos/Slate.app/Contents/Info.plist
+          node scripts/validate-release.mjs --tag "$GITHUB_REF_NAME"
+          git diff --exit-code -- package.json package-lock.json src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/tauri.conf.json
+          mkdir release-assets
+          cp src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg release-assets/
+          cp src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app.tar.gz release-assets/
+          cp src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app.tar.gz.sig release-assets/
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: preview-macos
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: [windows, macos]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    concurrency:
+      group: slate-preview-publication
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '26'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: preview-*
+          path: release-assets
+      - name: Publish complete Preview and advance feed
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node scripts/validate-release.mjs --tag "$GITHUB_REF_NAME"
+          node scripts/publish-preview.mjs --artifacts release-assets

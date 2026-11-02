@@ -1,7 +1,8 @@
+import { mutationsFrozen } from './mutationGate'
 import { get } from 'svelte/store'
 import {
   content, currentFile, currentFolder, files, folders, dirty, statusMsg, reloadTrigger,
-  mdOnlyMode, showHiddenFiles,
+  mdOnlyMode, showHiddenFiles, activeTabId, documentRevision,
 } from './stores'
 import { listMarkdownFiles, listTextFiles, listSubfolders, readFile, dirName } from './tauri'
 import { openTab } from './tabs'
@@ -24,6 +25,7 @@ export async function listWorkspace(dir: string): Promise<void> {
  *  for files opened via OS association, the "Open file…" dialog, and
  *  relative links — switches to an already-open tab instead of duplicating it. */
 export async function loadFile(path: string) {
+  if (mutationsFrozen()) return
   const dir = dirName(path)
   if (dir) {
     currentFolder.set(dir)
@@ -72,6 +74,7 @@ export async function folderUp() {
 /** Manual refresh: re-list the folder and re-read the open file from disk.
  *  An explicit action — unsaved edits are discarded in favor of disk state. */
 export async function refreshWorkspace() {
+  if (mutationsFrozen()) return
   const folder = get(currentFolder)
   if (!folder) {
     statusMsg.set('Choose a folder first')
@@ -85,9 +88,13 @@ export async function refreshWorkspace() {
   }
   const path = get(currentFile)
   if (path) {
+    const id = get(activeTabId)
+    const revision = id ? documentRevision(id) : 0
     const hadEdits = get(dirty)
     try {
-      content.set(await readFile(path))
+      const text = await readFile(path)
+      if (mutationsFrozen() || path !== get(currentFile) || id !== get(activeTabId) || (id && documentRevision(id) !== revision)) return
+      content.set(text)
       dirty.set(false)
       reloadTrigger.update((n) => n + 1)
     } catch (e) {

@@ -9,6 +9,19 @@ export interface BuildInfo {
 /** Immutable source provenance compiled into the native application. */
 export const getBuildInfo = () => invoke<BuildInfo>('get_build_info')
 
+export interface UpdateStatus {
+  phase: 'unavailable' | 'idle' | 'checking' | 'noRelease' | 'upToDate' | 'available' | 'downloading' | 'downloaded' | 'preparing' | 'installing' | 'error'
+  version: string | null
+  notes: string
+  downloadedBytes: number
+  totalBytes: number | null
+  message: string
+}
+export const getUpdateStatus = () => invoke<UpdateStatus>('get_update_status')
+export const checkForUpdates = () => invoke<UpdateStatus>('check_for_updates')
+export const downloadUpdate = () => invoke<UpdateStatus>('download_update')
+export const installUpdate = () => invoke<UpdateStatus>('install_update')
+
 export const listMarkdownFiles = (folder: string, showHidden: boolean) =>
   invoke<string[]>('list_markdown_files', { folder, showHidden })
 

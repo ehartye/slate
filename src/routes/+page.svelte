@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { registerUpdateSafety, saveActiveDocument, mutationsFrozen } from '$lib/updateSafety'
   import Toolbar from '$lib/components/Toolbar.svelte'
   import Sidebar from '$lib/components/Sidebar.svelte'
   import StatusBar from '$lib/components/StatusBar.svelte'
@@ -13,7 +14,7 @@
   import {
     content, currentFile, dirty, statusMsg, editorScroll, tabs, activeTabId,
     sidebarCollapsed, editorCollapsed, previewCollapsed, previewZoom, reloadTrigger,
-    sidebarWidth, findOpen, mdOnlyMode, showHiddenFiles,
+    sidebarWidth, findOpen, mdOnlyMode, showHiddenFiles, documentRevision,
   } from '$lib/stores'
   import { writeFile, readFile, openNewWindow, baseName } from '$lib/tauri'
   import { loadFile } from '$lib/workspace'
@@ -98,6 +99,7 @@
     register(await listen<string>('open-file', (event) => loadFile(event.payload)))
 
     register(await listen<string>('file-changed', async (event) => {
+      if (mutationsFrozen()) return
       const path = event.payload
       if (suppressNextChangeFor.delete(path)) return
 
@@ -114,7 +116,11 @@
         return
       }
       try {
-        content.set(await readFile(path))
+        const id = $activeTabId
+        const revision = id ? documentRevision(id) : 0
+        const text = await readFile(path)
+        if (mutationsFrozen() || path !== $currentFile || $dirty || id !== $activeTabId || (id && documentRevision(id) !== revision)) return
+        content.set(text)
         clearImageCache()
         reloadTrigger.update(n => n + 1)
         statusMsg.set('Reloaded from disk')
@@ -134,6 +140,7 @@
       else cleanups.push(unlisten)
     }
 
+    registerUpdateSafety(register).catch(() => {})
     initFileOpen(register).catch((e) => statusMsg.set(`Could not open file: ${e}`))
 
     return () => {
@@ -203,8 +210,7 @@
     }
     try {
       suppressNextChangeFor.add(path)
-      await writeFile(path, $content)
-      dirty.set(false)
+      await saveActiveDocument(writeFile)
       statusMsg.set('')
     } catch (e) {
       suppressNextChangeFor.delete(path)
