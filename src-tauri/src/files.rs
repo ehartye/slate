@@ -120,6 +120,72 @@ pub fn new_window_url_path(open_path: Option<&str>) -> String {
     }
 }
 
+/// Why `name` can't be used as the name of a new file in a folder, or `Ok`
+/// if it can. A *name*, not a path: anything with a separator is rejected
+/// rather than resolved, so "New file" can only ever create a file directly
+/// inside the folder the sidebar is showing.
+///
+/// The Windows rules (reserved characters and device names, no trailing dot)
+/// are enforced on every OS — a folder synced to or shared with a Windows
+/// machine would otherwise end up holding a file that machine can't open, and
+/// none of these are names anyone would mean to pick.
+pub fn validate_new_file_name(name: &str) -> Result<(), String> {
+    if name.trim().is_empty() {
+        return Err("Enter a file name".into());
+    }
+    if name != name.trim() {
+        return Err("File names can't start or end with a space".into());
+    }
+    if name == "." || name == ".." {
+        return Err("That name is reserved".into());
+    }
+    if name.contains(['/', '\\']) {
+        return Err("Use a name, not a path — the file goes in this folder".into());
+    }
+    if name.chars().any(char::is_control) {
+        return Err("File names can't contain control characters".into());
+    }
+    if let Some(c) = name.chars().find(|c| matches!(c, '<' | '>' | ':' | '"' | '|' | '?' | '*')) {
+        return Err(format!("File names can't contain {c}"));
+    }
+    if name.ends_with('.') {
+        return Err("File names can't end with a dot".into());
+    }
+    let stem = name.split('.').next().unwrap_or("").to_ascii_uppercase();
+    let numbered_device = (stem.starts_with("COM") || stem.starts_with("LPT"))
+        && stem.len() == 4
+        && matches!(stem.as_bytes()[3], b'1'..=b'9');
+    if matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL") || numbered_device {
+        return Err(format!("{name} is a name Windows reserves"));
+    }
+    Ok(())
+}
+
+/// Create a new, empty file called `name` inside `folder` and return its path.
+/// Never touches an existing file: the create is exclusive (`create_new`), so
+/// a name that's already taken — including one created by something else
+/// between the user typing it and this running — is an error rather than a
+/// silent truncation of whatever is there.
+///
+/// The path is built with `Path::join`, exactly as the folder listing builds
+/// its paths, so the returned string matches the sidebar's entry for the same
+/// file character for character (tabs and the sidebar highlight compare paths
+/// as strings).
+pub fn create_new_file(folder: &Path, name: &str) -> Result<PathBuf, String> {
+    validate_new_file_name(name)?;
+    if !folder.is_dir() {
+        return Err("This folder no longer exists".into());
+    }
+    let path = folder.join(name);
+    match std::fs::OpenOptions::new().write(true).create_new(true).open(&path) {
+        Ok(_) => Ok(path),
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            Err(format!("{name} already exists"))
+        }
+        Err(e) => Err(e.to_string()),
+    }
+}
+
 /// Drop Windows' `\\?\` extended-length / verbatim prefix so the result matches
 /// the plain `C:\...` paths used elsewhere in the app. No-op on other platforms
 /// and for paths without the prefix.
@@ -310,5 +376,50 @@ mod tests {
         assert!(!is_image(Path::new("a.pdf")));
         assert!(!is_image(Path::new("a.md")));
         assert!(!is_image(Path::new("noext")));
+    }
+
+    #[test]
+    fn accepts_ordinary_new_file_names() {
+        for name in ["notes.md", "Makefile", ".env", "a b.txt", "v1.2.json", "console.md", "COM0.txt", "été.md"] {
+            assert_eq!(validate_new_file_name(name), Ok(()), "{name}");
+        }
+    }
+
+    #[test]
+    fn rejects_unusable_new_file_names() {
+        for name in [
+            "", "   ", " a.md", "a.md ", ".", "..", "a/b.md", r"a\b.md", "../x.md",
+            "a:b.md", "what?.md", "a*.md", "a\"b.md", "a|b", "a<b", "tab\tname", "trailing.",
+            "CON", "con.md", "Nul.txt", "COM1", "lpt9.log",
+        ] {
+            assert!(validate_new_file_name(name).is_err(), "{name:?} should be rejected");
+        }
+    }
+
+    #[test]
+    fn creates_an_empty_file_at_the_listing_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let got = create_new_file(dir.path(), "new.md").unwrap();
+        assert_eq!(got, dir.path().join("new.md"));
+        assert_eq!(fs::read_to_string(&got).unwrap(), "");
+    }
+
+    #[test]
+    fn never_overwrites_an_existing_file() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("keep.md"), "precious").unwrap();
+        let err = create_new_file(dir.path(), "keep.md").unwrap_err();
+        assert!(err.contains("already exists"), "{err}");
+        assert_eq!(fs::read_to_string(dir.path().join("keep.md")).unwrap(), "precious");
+    }
+
+    #[test]
+    fn create_rejects_paths_and_missing_folders() {
+        let dir = tempfile::tempdir().unwrap();
+        let inner = dir.path().join("inner");
+        fs::create_dir(&inner).unwrap();
+        assert!(create_new_file(&inner, "../escape.md").is_err());
+        assert!(!dir.path().join("escape.md").exists());
+        assert!(create_new_file(&dir.path().join("gone"), "a.md").is_err());
     }
 }

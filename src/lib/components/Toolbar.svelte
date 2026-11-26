@@ -14,6 +14,9 @@
   import { buildStandaloneHtml, collectThemeFontCss, collectMermaidScript } from '$lib/export'
   import { inlineLocalImages } from '$lib/images'
   import { isViewerPath } from '$lib/fileKind'
+  import { tip } from '$lib/tooltip'
+  import { modShortcut } from '$lib/platform'
+  import Icon from './Icon.svelte'
   import ThemePanel from './ThemePanel.svelte'
   import AboutDialog from './AboutDialog.svelte'
 
@@ -42,7 +45,7 @@
   })
 
   async function openInBrowser() {
-    if (isViewerActive) return // nothing meaningful to export for a pdf/image tab
+    if (isViewerActive || !$currentFile) return // nothing meaningful to export
     const theme = $themes.find((t) => t.name === $activeThemeName && t.mode === $activeMode)
     const fontCss = await collectThemeFontCss(theme?.css ?? '')
     let bodyHtml = renderMarkdown($content)
@@ -86,8 +89,7 @@
   <button
     class="icon-btn sidebar-toggle"
     onclick={() => sidebarCollapsed.update((v) => !v)}
-    title={$sidebarCollapsed ? 'Show file browser' : 'Hide file browser'}
-    aria-label="Toggle file browser"
+    use:tip={{ label: $sidebarCollapsed ? 'Show file browser' : 'Hide file browser' }}
     aria-pressed={!$sidebarCollapsed}
   >
     <!-- App frame with the sidebar pane: filled while shown, empty while hidden. -->
@@ -110,51 +112,47 @@
 
   <span class="spacer"></span>
 
-  <button class="browser-btn" title="About Slate" aria-label="About Slate"
-    onclick={() => { panelOpen = false; aboutOpen = true }}>
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
-      <circle cx="8" cy="8" r="6.5" stroke-width="1.5" />
-      <path d="M8 7v5M8 4v1" stroke-width="1.5" />
-    </svg>
-  </button>
+  <div class="tool-group" role="toolbar" aria-label="View and export">
+    <button
+      class="tool-btn"
+      onclick={toggleMdOnly}
+      aria-pressed={$mdOnlyMode}
+      use:tip={{
+        label: 'Markdown files only',
+        hint: $mdOnlyMode ? 'On — click to browse every text file' : 'Off — click to show only markdown',
+      }}
+    ><Icon name="markdown" /></button>
+    <span class="tool-sep" aria-hidden="true"></span>
+    <button
+      class="tool-btn"
+      onclick={newWindow}
+      use:tip={{ label: 'New window', keys: modShortcut('N') }}
+    ><Icon name="window-plus" /></button>
+    <button
+      class="tool-btn"
+      onclick={openInBrowser}
+      aria-disabled={isViewerActive || !$currentFile}
+      use:tip={{
+        label: 'Open in browser',
+        hint: !$currentFile ? 'Open a file first'
+          : isViewerActive ? 'Not available for PDFs and images'
+          : 'View the rendered page, ready to print or share',
+      }}
+    ><Icon name="external" /></button>
+  </div>
 
   <button
-    class="browser-btn"
-    class:off={!$mdOnlyMode}
-    onclick={toggleMdOnly}
-    title={$mdOnlyMode
-      ? 'Showing markdown files only — click to browse any text file'
-      : 'Browsing all text files — click to show markdown files only'}
-    aria-label="Toggle markdown-only file browsing"
-    aria-pressed={$mdOnlyMode}
-  >
-    <span class="nf-icon">{'\u{f0354}'}</span>
-  </button>
-
-  <button
-    class="browser-btn"
-    onclick={newWindow}
-    title="Open a new Slate window (Ctrl/Cmd+N)"
-    aria-label="Open a new Slate window"
-  >
-    <span class="nf-icon">{'\ueb23'}</span>
-  </button>
-
-  <button
-    class="browser-btn"
-    onclick={openInBrowser}
-    disabled={isViewerActive}
-    title={isViewerActive ? 'Not available for PDF or image files' : 'Open the rendered document in your browser'}
-    aria-label="Open in browser"
-  >
-    <span class="nf-icon">{'\uf08e'}</span>
-  </button>
+    class="icon-btn toolbar-about"
+    onclick={() => { panelOpen = false; aboutOpen = true }}
+    use:tip={{ label: 'About Slate' }}
+  ><Icon name="info" /></button>
 
   <button
     class="theme-open-btn"
     class:active={panelOpen}
     onclick={() => (panelOpen = !panelOpen)}
-    title="Choose a theme"
+    aria-expanded={panelOpen}
+    use:tip={{ label: 'Theme', hint: 'Restyles the whole app — editor, preview and icon' }}
   >
     <span
       class="tb-swatch"

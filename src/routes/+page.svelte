@@ -16,9 +16,10 @@
     sidebarWidth, findOpen, mdOnlyMode, showHiddenFiles,
   } from '$lib/stores'
   import { writeFile, readFile, openNewWindow, baseName } from '$lib/tauri'
+  import { activeTextForDisk } from '$lib/stores'
   import { loadFile } from '$lib/workspace'
   import { closeTab, cycleTab, markBackgroundTabForReload } from '$lib/tabs'
-  import { isMarkdownPath, isPdfPath, isImagePath, isViewerPath } from '$lib/fileKind'
+  import { isPdfPath, isImagePath, isViewerPath } from '$lib/fileKind'
   import { loadZoom, setZoom, nudgeZoom } from '$lib/zoom'
   import { loadSidebarWidth, clampSidebarWidth, persistSidebarWidth } from '$lib/sidebarWidth'
   import { loadMdOnlyMode, loadShowHiddenFiles } from '$lib/viewOptions'
@@ -114,7 +115,7 @@
         return
       }
       try {
-        content.set(await readFile(path))
+        content.load(await readFile(path))
         clearImageCache()
         reloadTrigger.update(n => n + 1)
         statusMsg.set('Reloaded from disk')
@@ -197,13 +198,17 @@
       statusMsg.set('Open a file before saving')
       return
     }
-    if (!isMarkdownPath(path)) {
-      statusMsg.set('Read-only — only markdown files can be edited')
+    // Any text tab saves; a PDF or image tab has no text behind it. This guard
+    // is load-bearing, not cosmetic: for those tabs `$content` is '', so
+    // writing it would replace the file with nothing.
+    const text = isViewerPath(path) ? null : activeTextForDisk()
+    if (text === null) {
+      statusMsg.set('PDFs and images open read-only')
       return
     }
     try {
       suppressNextChangeFor.add(path)
-      await writeFile(path, $content)
+      await writeFile(path, text)
       dirty.set(false)
       statusMsg.set('')
     } catch (e) {

@@ -6,11 +6,15 @@ vi.mock('../src/lib/tauri', async (importOriginal) => {
   return {
     ...orig,
     listMarkdownFiles: vi.fn(), listTextFiles: vi.fn(), listSubfolders: vi.fn(), readFile: vi.fn(),
+    createFile: vi.fn(),
   }
 })
 
-import { loadFile, refreshWorkspace, browseFolder, folderUp, relistCurrentFolder } from '../src/lib/workspace'
-import { listMarkdownFiles, listTextFiles, listSubfolders, readFile } from '../src/lib/tauri'
+import {
+  loadFile, refreshWorkspace, browseFolder, folderUp, relistCurrentFolder,
+  resolveNewFileName, createFileInCurrentFolder,
+} from '../src/lib/workspace'
+import { listMarkdownFiles, listTextFiles, listSubfolders, readFile, createFile } from '../src/lib/tauri'
 import {
   content, currentFile, currentFolder, files, folders, dirty, statusMsg, reloadTrigger,
   mdOnlyMode, showHiddenFiles, tabs, activeTabId, setTabText,
@@ -20,6 +24,7 @@ const mockList = vi.mocked(listMarkdownFiles)
 const mockTextList = vi.mocked(listTextFiles)
 const mockSubfolders = vi.mocked(listSubfolders)
 const mockRead = vi.mocked(readFile)
+const mockCreate = vi.mocked(createFile)
 
 /** Put the app into the state it's actually in when a file is open: a tab
  *  whose document is what `content` is a view of. Setting `currentFile` and
@@ -214,3 +219,62 @@ describe('relistCurrentFolder', () => {
   })
 })
 
+describe('resolveNewFileName', () => {
+  it('makes a bare name a markdown file in Markdown-only mode', () => {
+    expect(resolveNewFileName('notes', true)).toBe('notes.md')
+    expect(resolveNewFileName('  notes  ', true)).toBe('notes.md')
+  })
+
+  it('keeps an explicit extension, and dotfiles, as typed', () => {
+    expect(resolveNewFileName('script.py', true)).toBe('script.py')
+    expect(resolveNewFileName('.env', true)).toBe('.env')
+  })
+
+  it('leaves a bare name bare when browsing all files', () => {
+    expect(resolveNewFileName('Makefile', false)).toBe('Makefile')
+  })
+})
+
+describe('createFileInCurrentFolder', () => {
+  it('creates the file, relists the folder and opens it in a tab', async () => {
+    currentFolder.set('/notes')
+    mdOnlyMode.set(true)
+    mockCreate.mockResolvedValue('/notes/idea.md')
+    mockList.mockResolvedValue(['/notes/idea.md'])
+    mockRead.mockResolvedValue('')
+
+    expect(await createFileInCurrentFolder('idea')).toBeNull()
+
+    expect(mockCreate).toHaveBeenCalledWith('/notes', 'idea.md')
+    expect(get(files)).toEqual(['/notes/idea.md'])
+    expect(get(currentFile)).toBe('/notes/idea.md')
+    expect(get(statusMsg)).toBe('Created idea.md')
+  })
+
+  it('explains when Markdown-only mode hides the new file', async () => {
+    currentFolder.set('/notes')
+    mdOnlyMode.set(true)
+    mockCreate.mockResolvedValue('/notes/run.py')
+    mockList.mockResolvedValue([])
+    mockRead.mockResolvedValue('')
+
+    expect(await createFileInCurrentFolder('run.py')).toBeNull()
+    expect(get(currentFile)).toBe('/notes/run.py')
+    expect(get(statusMsg)).toContain('turn off Markdown only')
+  })
+
+  it('returns the backend\'s reason, opening nothing, when creation fails', async () => {
+    currentFolder.set('/notes')
+    mockCreate.mockRejectedValue('idea.md already exists')
+
+    expect(await createFileInCurrentFolder('idea.md')).toBe('idea.md already exists')
+    expect(get(tabs)).toEqual([])
+  })
+
+  it('needs a folder and a name', async () => {
+    expect(await createFileInCurrentFolder('x.md')).toBe('Choose a folder first')
+    currentFolder.set('/notes')
+    expect(await createFileInCurrentFolder('   ')).toBe('Enter a file name')
+    expect(mockCreate).not.toHaveBeenCalled()
+  })
+})

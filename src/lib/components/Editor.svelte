@@ -98,12 +98,12 @@
     knownTabIds = currentIds
   })
 
-  /** Non-markdown files are viewable but locked for editing — fixed for a
-   *  tab's lifetime (its path never changes), so this is baked in at
-   *  creation rather than needing a reconfigurable Compartment (unlike the
-   *  language itself, which does need one — see loadLanguageFor). */
+  /** Every text tab is editable — markdown or not. (PDF and image tabs never
+   *  reach this component: +page.svelte doesn't mount the editor for them.)
+   *  The document's text arrives LF-normalized; the file's own line endings
+   *  are restored on save (see lineEndings.ts), so nothing here has to know
+   *  about them. */
   function buildExtensions(path: string) {
-    const readOnly = !isMarkdownPath(path)
     return [
       lineNumbers(),
       highlightActiveLine(),
@@ -117,8 +117,6 @@
       syntaxHighlighting(mdHighlight),
       syntaxHighlighting(codeHighlight),
       EditorView.lineWrapping,
-      EditorState.readOnly.of(readOnly),
-      EditorView.editable.of(!readOnly),
       EditorView.updateListener.of((u) => {
         if (u.docChanged) {
           content.set(u.state.doc.toString())

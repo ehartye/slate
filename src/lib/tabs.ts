@@ -18,7 +18,7 @@
 import { get } from 'svelte/store'
 import {
   tabs, activeTabId, currentFile, dirty, editorScroll, reloadTrigger, statusMsg,
-  setTabText, setTabPdf, setTabImage, dropTabDoc, hasTabDoc, type Tab,
+  loadTabText, setTabPdf, setTabImage, dropTabDoc, hasTabDoc, type Tab,
 } from './stores'
 import { readFile, readPdfAsDataUrl, readImageAsDataUrl } from './tauri'
 import { isPdfPath, isViewerPath } from './fileKind'
@@ -90,7 +90,7 @@ export async function openTab(path: string): Promise<void> {
     return
   }
   captureActiveTabState()
-  setTabText(tab.id, text)
+  loadTabText(tab.id, text)
   tabs.update((ts) => [...ts, tab])
   activeTabId.set(tab.id)
   currentFile.set(path)
@@ -133,7 +133,7 @@ export async function switchToTab(id: string): Promise<void> {
       const dataUrl = await (isPdf ? readPdfAsDataUrl(target.path) : readImageAsDataUrl(target.path))
       ;(isPdf ? setTabPdf : setTabImage)(id, dataUrl)
     } else {
-      setTabText(id, await readFile(target.path))
+      loadTabText(id, await readFile(target.path))
       // Editor.svelte may already have built this tab's editor state from the
       // pre-reload text while the read was in flight; the trigger makes it
       // resync from what's now on disk.
@@ -193,4 +193,54 @@ export async function cycleTab(dir: 1 | -1): Promise<void> {
   const idx = ts.findIndex((t) => t.id === get(activeTabId))
   const next = ts[(idx + dir + ts.length) % ts.length]
   await switchToTab(next.id)
+}
+
+/** Which side of a tab a bulk close reaches: every other tab, or only the
+ *  ones to its right or left — the tab context menu's three bulk actions. */
+export type CloseScope = 'others' | 'right' | 'left'
+
+/** The ids a bulk close of `scope` around `anchorId` would reach, in tab
+ *  order. Never includes the anchor itself; empty for an unknown anchor.
+ *  Pure, so the context menu can also use it to disable an action that would
+ *  close nothing (e.g. "Close to the Right" on the last tab). */
+export function tabIdsInScope(list: readonly Tab[], anchorId: string, scope: CloseScope): string[] {
+  const idx = list.findIndex((t) => t.id === anchorId)
+  if (idx === -1) return []
+  const reached =
+    scope === 'right' ? list.slice(idx + 1)
+    : scope === 'left' ? list.slice(0, idx)
+    : list.filter((t) => t.id !== anchorId)
+  return reached.map((t) => t.id)
+}
+
+/** Close every tab `scope` reaches around `anchorId` — except tabs with
+ *  unsaved changes, which stay open (and are counted in the status message).
+ *  A single close discards edits only because the user pointed at that one
+ *  tab; a bulk close sweeping several unsaved documents away unannounced
+ *  would be a much easier way to lose work.
+ *
+ *  If the active tab is among those closed, the anchor (the tab that was
+ *  right-clicked, which a bulk close never removes) becomes active — once,
+ *  up front — rather than closing tabs one at a time and switching to a
+ *  neighbor that is itself about to close. */
+export async function closeTabsAround(anchorId: string, scope: CloseScope): Promise<void> {
+  // The active tab's `dirty` flag lives in the `dirty` store, not its tab
+  // record, until it's snapshotted — and that flag decides what's kept.
+  captureActiveTabState()
+  const current = get(tabs)
+  const reached = new Set(tabIdsInScope(current, anchorId, scope))
+  if (reached.size === 0) return
+  const kept = current.filter((t) => reached.has(t.id) && t.dirty)
+  const closing = new Set([...reached].filter((id) => !kept.some((t) => t.id === id)))
+
+  const active = get(activeTabId)
+  if (active && closing.has(active)) await switchToTab(anchorId)
+
+  tabs.update((ts) => ts.filter((t) => !closing.has(t.id)))
+  for (const id of closing) dropTabDoc(id)
+
+  if (kept.length > 0) {
+    const n = kept.length
+    statusMsg.set(`Kept ${n} tab${n === 1 ? '' : 's'} with unsaved changes open`)
+  }
 }

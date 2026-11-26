@@ -1,5 +1,6 @@
 import { writable, derived, get, type Readable } from 'svelte/store'
 import type { Theme } from './theme'
+import { detectEol, normalizeEol, applyEol, type Eol } from './lineEndings'
 
 export const currentFolder = writable<string | null>(null)
 export const files = writable<string[]>([])          // full paths
@@ -25,7 +26,9 @@ export const activeTabId = writable<string | null>(null)
  *  pipeline, Save, "Open in browser") from ever having to guard against it
  *  holding a large base64 blob. */
 export type TabDoc =
-  | { kind: 'text'; text: string }
+  // `text` is always LF-normalized; `eol` is the line ending the file uses
+  // on disk, put back only when saving (see lineEndings.ts).
+  | { kind: 'text'; text: string; eol: Eol }
   | { kind: 'pdf'; dataUrl: string }
   | { kind: 'image'; dataUrl: string }
 
@@ -54,8 +57,22 @@ function mutateDocs(fn: (docs: Map<string, TabDoc>) => void): void {
   })
 }
 
+/** Replace a tab's text with an *edit* — LF-normalized text from the editor.
+ *  Keeps whatever line ending the tab's file was loaded with. */
 export function setTabText(id: string, text: string): void {
-  mutateDocs((docs) => { docs.set(id, { kind: 'text', text }) })
+  mutateDocs((docs) => {
+    const existing = docs.get(id)
+    const eol = existing?.kind === 'text' ? existing.eol : '\n'
+    docs.set(id, { kind: 'text', text: normalizeEol(text), eol })
+  })
+}
+
+/** Replace a tab's text with what was just read *from disk*: notes the file's
+ *  line ending and normalizes the text, so an edit-and-save writes the file
+ *  back with the line endings it already had. Every disk read of a text tab
+ *  goes through here (or `content.load`), never `setTabText`. */
+export function loadTabText(id: string, raw: string): void {
+  mutateDocs((docs) => { docs.set(id, { kind: 'text', text: normalizeEol(raw), eol: detectEol(raw) }) })
 }
 
 export function setTabPdf(id: string, dataUrl: string): void {
@@ -84,7 +101,7 @@ export const currentFile = writable<string | null>(null)
  *  one tab's text while another tab is on screen. That used to be possible,
  *  and since `content` is what save() writes to disk, it could put one tab's
  *  text into another tab's file. */
-export const content: Readable<string> & { set(text: string): void } = {
+export const content: Readable<string> & { set(text: string): void; load(raw: string): void } = {
   subscribe: derived(activeDoc, (doc) => (doc?.kind === 'text' ? doc.text : '')).subscribe,
   set(text: string) {
     const id = get(activeTabId)
@@ -96,6 +113,23 @@ export const content: Readable<string> & { set(text: string): void } = {
     if (existing && existing.kind !== 'text') return
     setTabText(id, text)
   },
+  /** Like `set`, for text just read from disk — see `loadTabText`. */
+  load(raw: string) {
+    const id = get(activeTabId)
+    if (!id) return
+    const existing = get(tabDocs).get(id)
+    if (existing && existing.kind !== 'text') return
+    loadTabText(id, raw)
+  },
+}
+
+/** The active tab's text exactly as it should be written to disk — with the
+ *  file's own line endings restored — or null when the active tab isn't text
+ *  (a PDF or image tab, or none), which has nothing a save could write. */
+export function activeTextForDisk(): string | null {
+  const id = get(activeTabId)
+  const doc = id ? get(tabDocs).get(id) : undefined
+  return doc?.kind === 'text' ? applyEol(doc.text, doc.eol) : null
 }
 
 /** The active tab's PDF content as a `data:` URL, or null when the active tab

@@ -1,9 +1,10 @@
 <script lang="ts">
   import { currentFile, dirty, statusMsg, previewZoom } from '$lib/stores'
   import { nudgeZoom, setZoom } from '$lib/zoom'
-  import { isMarkdownPath } from '$lib/fileKind'
+  import { isViewerPath } from '$lib/fileKind'
 
-  let readOnly = $derived($currentFile !== null && !isMarkdownPath($currentFile))
+  // Only PDF and image tabs are read-only; every text file can be edited.
+  let readOnly = $derived(isViewerPath($currentFile))
 </script>
 
 <footer class="statusbar">
@@ -11,7 +12,7 @@
   <span class="spacer"></span>
   {#if $statusMsg}<span class="msg">{$statusMsg}</span>{/if}
   {#if readOnly}
-    <span class="readonly" title="Only markdown files can be edited">read-only</span>
+    <span class="readonly" title="PDFs and images open read-only">read-only</span>
   {/if}
   {#if $dirty}<span class="unsaved">● unsaved</span>{/if}
   <span class="zoom" title="Preview zoom (Ctrl +/− , Ctrl 0 to reset)">
