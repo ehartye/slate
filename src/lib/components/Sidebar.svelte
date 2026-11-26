@@ -77,6 +77,9 @@
     creating = false
     if (error) {
       nameError = error
+      // The field was disabled while creating; let it re-enable before
+      // refocusing, or the focus call is a no-op in WebKit.
+      await tick()
       nameInput?.focus()
       return
     }

@@ -11,6 +11,8 @@
   import { annotationRectToPercent, resolveDestinationPage, type LinkRect } from '$lib/pdfLinks'
   import { PageRenders } from '$lib/pdfRender'
   import PdfOutline, { type OutlineNode } from './PdfOutline.svelte'
+  import Icon from './Icon.svelte'
+  import { tip } from '$lib/tooltip'
   import { AnnotationType } from 'pdfjs-dist'
   import type { PDFDocumentProxy, PDFDocumentLoadingTask, PDFPageProxy } from 'pdfjs-dist'
 
@@ -439,14 +441,14 @@
   <div class="pdf-toolbar">
     <div class="pdf-toolbar-group">
       <button
-        class="pdf-btn"
+        class="pdf-btn pdf-icon-btn"
         class:active={showOutline}
-        onclick={toggleOutline}
-        disabled={outline.length === 0}
-        title={outline.length ? 'Table of contents' : 'This PDF has no table of contents'}
-        aria-label="Toggle table of contents"
+        onclick={() => outline.length > 0 && toggleOutline()}
+        aria-disabled={outline.length === 0}
+        aria-pressed={showOutline}
+        use:tip={{ label: 'Table of contents', hint: outline.length ? undefined : 'This PDF has none' }}
       >
-        <span class="nf-icon">{'\u{f0836}'}</span>
+        <Icon name="toc" />
       </button>
       <span class="pdf-pagenav">
         <button class="pdf-btn" onclick={prevPage} disabled={currentPageNum <= 1} aria-label="Previous page">‹</button>
@@ -456,11 +458,13 @@
     </div>
     <div class="pdf-toolbar-group">
       <span class="pdf-fit">
-        <button class="pdf-btn" class:active={fitMode === 'width'} onclick={setFitWidth} title="Fit width" aria-label="Fit page width to the window">
-          <span class="nf-icon">{'\u{f084e}'}</span>
+        <button class="pdf-btn pdf-icon-btn" class:active={fitMode === 'width'} aria-pressed={fitMode === 'width'} onclick={setFitWidth}
+          use:tip={{ label: 'Fit width', hint: 'Page width fills the window' }}>
+          <Icon name="fit-width" />
         </button>
-        <button class="pdf-btn" class:active={fitMode === 'page'} onclick={setFitPage} title="Fit page" aria-label="Fit whole page in the window">
-          <span class="nf-icon">{'\u{f0ef5}'}</span>
+        <button class="pdf-btn pdf-icon-btn" class:active={fitMode === 'page'} aria-pressed={fitMode === 'page'} onclick={setFitPage}
+          use:tip={{ label: 'Fit page', hint: 'Whole page fits in the window' }}>
+          <Icon name="fit-page" />
         </button>
       </span>
       <span class="pdf-zoom">
