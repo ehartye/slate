@@ -8,11 +8,12 @@ vi.mock('../src/lib/tauri', async (importOriginal) => {
 
 import {
   openTab, switchToTab, closeTab, findTabByPath, markBackgroundTabForReload, cycleTab,
+  tabIdsInScope, closeTabsAround,
 } from '../src/lib/tabs'
 import { readFile, readPdfAsDataUrl, readImageAsDataUrl } from '../src/lib/tauri'
 import {
   tabs, activeTabId, currentFile, content, dirty, editorScroll, reloadTrigger, statusMsg,
-  pdfDataUrl, imageDataUrl,
+  pdfDataUrl, imageDataUrl, activeTextForDisk, type Tab,
 } from '../src/lib/stores'
 
 const mockRead = vi.mocked(readFile)
@@ -498,5 +499,113 @@ describe('image tabs', () => {
 
     expect(get(tabs)).toEqual([])
     expect(get(statusMsg)).toContain('Could not open file')
+  })
+})
+
+const paths = () => get(tabs).map((t) => t.path)
+const idOf = (path: string) => get(tabs).find((t) => t.path === path)!.id
+
+async function openFive() {
+  mockRead.mockImplementation(async (p: string) => `text of ${p}`)
+  for (const p of ['/a.md', '/b.md', '/c.md', '/d.md', '/e.md']) await openTab(p)
+}
+
+describe('tabIdsInScope', () => {
+  const list = ['a', 'b', 'c'].map((id) => ({ id, path: `/${id}`, dirty: false, scrollFraction: 0, needsReload: false })) as Tab[]
+
+  it('reaches the tabs on the chosen side, never the anchor', () => {
+    expect(tabIdsInScope(list, 'b', 'right')).toEqual(['c'])
+    expect(tabIdsInScope(list, 'b', 'left')).toEqual(['a'])
+    expect(tabIdsInScope(list, 'b', 'others')).toEqual(['a', 'c'])
+  })
+
+  it('reaches nothing past either end, or for an unknown anchor', () => {
+    expect(tabIdsInScope(list, 'c', 'right')).toEqual([])
+    expect(tabIdsInScope(list, 'a', 'left')).toEqual([])
+    expect(tabIdsInScope(list, 'zzz', 'others')).toEqual([])
+  })
+})
+
+describe('closeTabsAround', () => {
+  it('closes the tabs to the right of the right-clicked tab', async () => {
+    await openFive()
+    await closeTabsAround(idOf('/b.md'), 'right')
+    expect(paths()).toEqual(['/a.md', '/b.md'])
+  })
+
+  it('closes the tabs to the left of the right-clicked tab', async () => {
+    await openFive()
+    await closeTabsAround(idOf('/d.md'), 'left')
+    expect(paths()).toEqual(['/d.md', '/e.md'])
+    expect(get(currentFile)).toBe('/e.md') // active tab survived, so it stays active
+  })
+
+  it('closes every other tab', async () => {
+    await openFive()
+    await closeTabsAround(idOf('/c.md'), 'others')
+    expect(paths()).toEqual(['/c.md'])
+  })
+
+  it('activates the right-clicked tab when the active one is closed', async () => {
+    await openFive() // /e.md is active
+    await closeTabsAround(idOf('/b.md'), 'right')
+    expect(get(currentFile)).toBe('/b.md')
+    expect(get(content)).toBe('text of /b.md')
+    expect(get(activeTabId)).toBe(idOf('/b.md'))
+  })
+
+  it('keeps tabs with unsaved changes open — including the active one', async () => {
+    await openFive()
+    await switchToTab(idOf('/c.md'))
+    content.set('edited c')
+    dirty.set(true) // the active tab's dirty flag lives only in the store so far
+    await switchToTab(idOf('/e.md'))
+    content.set('edited e')
+    dirty.set(true)
+
+    await closeTabsAround(idOf('/a.md'), 'others')
+
+    expect(paths()).toEqual(['/a.md', '/c.md', '/e.md'])
+    expect(get(currentFile)).toBe('/e.md')
+    expect(get(content)).toBe('edited e')
+    expect(get(statusMsg)).toBe('Kept 2 tabs with unsaved changes open')
+  })
+
+  it('does nothing when there is nothing on that side', async () => {
+    await openFive()
+    await closeTabsAround(idOf('/e.md'), 'right')
+    expect(paths()).toEqual(['/a.md', '/b.md', '/c.md', '/d.md', '/e.md'])
+    expect(get(statusMsg)).toBe('')
+  })
+})
+
+describe('line endings', () => {
+  it('normalizes a CRLF file for the app and restores CRLF for disk', async () => {
+    mockRead.mockResolvedValue('one\r\ntwo\r\n')
+    await openTab('/a.bat')
+
+    expect(get(content)).toBe('one\ntwo\n')
+    content.set('one\ntwo\nthree\n') // an edit, as the editor reports it
+    expect(activeTextForDisk()).toBe('one\r\ntwo\r\nthree\r\n')
+  })
+
+  it('leaves an LF file as LF', async () => {
+    mockRead.mockResolvedValue('one\ntwo\n')
+    await openTab('/a.py')
+    content.set('one\ntwo\nthree\n')
+    expect(activeTextForDisk()).toBe('one\ntwo\nthree\n')
+  })
+
+  it('re-detects the line ending when the file is reloaded from disk', async () => {
+    mockRead.mockResolvedValue('one\r\ntwo\r\n')
+    await openTab('/a.txt')
+    content.load('one\ntwo\n') // converted to LF by another program
+    expect(activeTextForDisk()).toBe('one\ntwo\n')
+  })
+
+  it('has nothing to write for a pdf tab', async () => {
+    mockReadPdf.mockResolvedValue('data:application/pdf;base64,AAA')
+    await openTab('/report.pdf')
+    expect(activeTextForDisk()).toBeNull()
   })
 })

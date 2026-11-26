@@ -3,7 +3,8 @@ import {
   content, currentFile, currentFolder, files, folders, dirty, statusMsg, reloadTrigger,
   mdOnlyMode, showHiddenFiles,
 } from './stores'
-import { listMarkdownFiles, listTextFiles, listSubfolders, readFile, dirName } from './tauri'
+import { listMarkdownFiles, listTextFiles, listSubfolders, readFile, dirName, createFile, baseName } from './tauri'
+import { extensionOf } from './fileKind'
 import { openTab } from './tabs'
 
 /** Populate the `files`/`folders` stores for `dir`, honoring the current
@@ -87,7 +88,7 @@ export async function refreshWorkspace() {
   if (path) {
     const hadEdits = get(dirty)
     try {
-      content.set(await readFile(path))
+      content.load(await readFile(path))
       dirty.set(false)
       reloadTrigger.update((n) => n + 1)
     } catch (e) {
@@ -100,3 +101,44 @@ export async function refreshWorkspace() {
   }
 }
 
+/** The file name "New file" will actually create for what the user typed.
+ *  With "Markdown only" on, a bare name (no extension) becomes a markdown
+ *  file — "notes" means notes.md in a markdown browser. With it off, a bare
+ *  name stays bare: `Makefile`, `LICENSE` and `Dockerfile` are real names.
+ *  Dotfiles (`.env`) count as having an extension, so they're never touched. */
+export function resolveNewFileName(input: string, mdOnly: boolean): string {
+  const name = input.trim()
+  if (!name) return name
+  return mdOnly && extensionOf(name) === '' ? `${name}.md` : name
+}
+
+/** Create a new, empty file in the folder the sidebar is showing, list it, and
+ *  open it in a tab ready to type into. Returns an error message for the user
+ *  (the name is taken, invalid, …) or null on success — the inline name field
+ *  shows the message beside what they typed rather than as a transient
+ *  status, so it can be corrected in place. */
+export async function createFileInCurrentFolder(input: string): Promise<string | null> {
+  const folder = get(currentFolder)
+  if (!folder) return 'Choose a folder first'
+  const name = resolveNewFileName(input, get(mdOnlyMode))
+  if (!name) return 'Enter a file name'
+
+  let path: string
+  try {
+    path = await createFile(folder, name)
+  } catch (e) {
+    return String(e)
+  }
+  try {
+    await listWorkspace(folder)
+  } catch (e) {
+    statusMsg.set(`Could not list folder: ${e}`)
+  }
+  await openTab(path)
+  statusMsg.set(
+    get(files).includes(path)
+      ? `Created ${baseName(path)}`
+      : `Created ${baseName(path)} — turn off Markdown only to see it in the list`,
+  )
+  return null
+}

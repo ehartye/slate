@@ -356,6 +356,14 @@ fn write_file(path: String, content: String) -> Result<(), String> {
     std::fs::write(&path, content).map_err(|e| e.to_string())
 }
 
+/// Create an empty file named `name` in `folder` (never overwriting one) and
+/// return its path — see `files::create_new_file`.
+#[tauri::command]
+fn create_file(folder: String, name: String) -> Result<String, String> {
+    files::create_new_file(std::path::Path::new(&folder), &name)
+        .map(|p| p.to_string_lossy().to_string())
+}
+
 #[tauri::command]
 fn set_window_icon(
     window: tauri::Window,
@@ -434,6 +442,7 @@ pub fn run() {
             read_pdf_as_data_url,
             read_image_as_data_url,
             write_file,
+            create_file,
             watch_file,
             unwatch_file,
             get_startup_file,

@@ -28,6 +28,12 @@ export const readFile = (path: string) => invoke<string>('read_file', { path })
 export const writeFile = (path: string, content: string) =>
   invoke<void>('write_file', { path, content })
 
+/** Create an empty file called `name` directly inside `folder` and return its
+ *  path. Rejects (with a message fit to show the user) a name that's taken,
+ *  is a path rather than a name, or isn't valid as a file name. */
+export const createFile = (folder: string, name: string) =>
+  invoke<string>('create_file', { folder, name })
+
 /** Resolve a relative `.md` link in `base` to an absolute path, or null if it's
  *  missing or not a markdown file. */
 export const resolveMdLink = (base: string, href: string) =>

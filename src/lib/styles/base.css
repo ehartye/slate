@@ -24,7 +24,7 @@ body { font-family: var(--ui-font); color: var(--fg); background: var(--bg); }
 
 /* Smooth whole-app restyle when switching theme */
 .toolbar, .statusbar, .sidebar, .editor-pane, .preview-pane, .divider, .sidebar-divider,
-.cm-host .cm-scroller, .cm-host .cm-gutters, .browser-btn, .theme-open-btn,
+.cm-host .cm-scroller, .cm-host .cm-gutters, .tool-group, .tool-btn, .theme-open-btn,
 .folder-btn, .sidebar li button, .preview, .preview pre, .preview blockquote,
 .pane-head, .rail, .collapse-btn, .icon-btn {
   transition: background-color .35s ease, color .3s ease, border-color .35s ease;
@@ -53,15 +53,50 @@ body { font-family: var(--ui-font); color: var(--fg); background: var(--bg); }
   white-space: nowrap; max-width: 38ch; }
 .spacer { flex: 1; }
 
-.browser-btn { background: var(--bg); color: var(--fg); border: 1px solid var(--border);
-  border-radius: 8px; padding: 5px 11px; cursor: pointer; font: inherit; font-size: 12.5px;
-  display: inline-flex; align-items: center; gap: 5px; }
-.browser-btn:hover { border-color: var(--accent); color: var(--accent); }
-.browser-btn:disabled { opacity: 0.35; cursor: default; }
-.browser-btn:disabled:hover { border-color: var(--border); color: var(--fg); }
-/* A toggle button in its "off" state (e.g. Markdown-only mode disabled). */
-.browser-btn.off { opacity: 0.5; }
-.browser-btn.off:hover { opacity: 1; }
+/* ── Icon toolbars ─────────────────────────────────────
+   Icon buttons travel in small groups (a quiet, bordered tray of related
+   actions) so a row reads as "these belong together" rather than as several
+   unrelated boxes. A toggle shows its state as a filled, accent-tinted key
+   (aria-pressed) instead of by fading out, so "off" never looks "disabled". */
+.icon { display: block; flex: 0 0 auto; }
+.tool-group { display: inline-flex; align-items: center; gap: 1px; padding: 2px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 9px; }
+.tool-btn { display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: none;
+  color: var(--fg-muted); cursor: pointer; }
+.tool-btn:hover { color: var(--fg); background: var(--accent-soft); }
+.tool-btn[aria-pressed='true'] { color: var(--accent); background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent); }
+.tool-btn[aria-pressed='true']:hover { color: var(--accent); }
+.tool-sep { width: 1px; height: 14px; margin: 0 3px; background: var(--border); flex: 0 0 auto; }
+/* aria-disabled rather than `disabled`: a disabled button swallows pointer
+   events, and with them the tooltip that explains *why* it's unavailable. */
+.tool-btn[aria-disabled='true'], .icon-btn[aria-disabled='true'] { opacity: 0.38; cursor: default; }
+.tool-btn[aria-disabled='true']:hover, .icon-btn[aria-disabled='true']:hover {
+  background: none; color: var(--fg-muted); }
+.tool-btn:focus-visible, .icon-btn:focus-visible, .folder-btn:focus-visible, .tab-open:focus-visible,
+.tab-close:focus-visible, .context-menu button:focus-visible, .empty-cta:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: -2px; }
+.toolbar-about { display: inline-flex; align-items: center; padding: 4px 5px; }
+
+/* ── Tooltip (see tooltip.ts) ──────────────────────────
+   Inverted (the theme's foreground as its background) so it reads crisply on
+   every light and dark theme without needing a color of its own. */
+.tip { position: fixed; z-index: 2000; pointer-events: none; max-width: 260px;
+  padding: 5px 8px; border-radius: 6px; background: var(--fg); color: var(--bg);
+  font-family: var(--ui-font); font-size: 11.5px; line-height: 1.35;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+  opacity: 0; transform: translateY(-2px); transition: opacity .12s ease, transform .12s ease; }
+.tip[data-side='above'] { transform: translateY(2px); }
+.tip.visible { opacity: 1; transform: none; }
+.tip-row { display: flex; align-items: center; gap: 10px; justify-content: space-between;
+  font-weight: 600; white-space: nowrap; }
+.tip-hint { margin-top: 2px; opacity: 0.72; font-weight: 400; }
+.tip-keys { display: inline-flex; gap: 3px; }
+.tip kbd, .context-menu kbd, .new-file-note kbd {
+  font-family: var(--editor-font); font-size: 10px; font-weight: 400; line-height: 1;
+  padding: 2px 4px; border-radius: 4px; border: 1px solid currentColor;
+  border-bottom-width: 2px; opacity: 0.8; }
 /* Nerd Font icon glyphs (independent of the active theme's --ui-font, which
    usually isn't a Nerd Font) — falls back to a plain glyphless box if none
    of these are installed. */
@@ -119,12 +154,39 @@ body { font-family: var(--ui-font); color: var(--fg); background: var(--bg); }
   overflow: auto; padding: 10px; }
 .sidebar-divider { width: 6px; cursor: col-resize; background: var(--border); flex: 0 0 auto; }
 .sidebar-divider:hover { background: var(--accent); }
-.sidebar-head { display: flex; align-items: center; gap: 2px; padding-bottom: 6px; }
-.folder-btn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  text-align: left; background: none; border: 0; color: var(--fg-muted);
-  cursor: pointer; font: inherit; font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase;
-  padding: 4px 6px; }
-.folder-btn:hover { color: var(--accent); }
+.sidebar-head { display: flex; flex-direction: column; gap: 6px; padding-bottom: 8px;
+  margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+.folder-line { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.folder-line .icon-btn { display: inline-flex; align-items: center; padding: 4px; }
+.folder-btn { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px;
+  text-align: left; background: none; border: 0; border-radius: 6px; color: var(--fg);
+  cursor: pointer; font: inherit; font-size: 11px; font-weight: 600; letter-spacing: 0.09em;
+  text-transform: uppercase; padding: 4px 6px; }
+.folder-btn .icon { color: var(--fg-muted); }
+.folder-btn:hover { color: var(--accent); background: var(--accent-soft); }
+.folder-btn:hover .icon { color: var(--accent); }
+.folder-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-actions { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.file-count { font-size: 11px; color: var(--fg-muted); white-space: nowrap; padding-left: 6px;
+  font-variant-numeric: tabular-nums; }
+.sidebar-empty { padding: 14px 8px; font-size: 12.5px; color: var(--fg-muted); }
+.sidebar-empty p { margin: 0 0 10px; line-height: 1.45; }
+.empty-cta { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px;
+  border: 1px solid var(--border); border-radius: 7px; background: var(--bg); color: var(--fg);
+  font: inherit; font-size: 12.5px; cursor: pointer; }
+.empty-cta:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Inline "New file" field, at the top of the list it's about to join. */
+.new-file { padding: 2px 0 6px; }
+.new-file-field { display: flex; align-items: center; gap: 6px; padding: 0 8px; border-radius: 7px;
+  background: var(--bg); border: 1px solid var(--accent); color: var(--accent); }
+.new-file.invalid .new-file-field { border-style: dashed; }
+.new-file input { flex: 1; min-width: 0; padding: 6px 0; border: 0; outline: 0; background: none;
+  color: var(--fg); font: inherit; font-size: 13px; }
+.new-file input::placeholder { color: var(--fg-muted); opacity: 0.7; }
+.new-file-note { padding: 5px 4px 0; font-size: 11px; line-height: 1.4; color: var(--fg-muted); }
+.new-file.invalid .new-file-note { color: var(--accent); font-weight: 600; }
+.new-file-note strong { color: var(--fg); font-weight: 600; }
 .sidebar ul { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .sidebar li button { width: 100%; text-align: left; background: none; border: 0; color: var(--fg);
   padding: 6px 9px; border-radius: 7px; cursor: pointer; font: inherit; font-size: 13px;
@@ -132,15 +194,20 @@ body { font-family: var(--ui-font); color: var(--fg); background: var(--bg); }
 .sidebar li button:hover { background: var(--accent-soft); }
 .sidebar li button.active { background: var(--accent-soft); color: var(--accent);
   box-shadow: inset 2px 0 0 var(--accent); font-weight: 600; }
-.sidebar li button.folder-row { color: var(--fg-muted); display: flex; align-items: center; gap: 6px; }
+.sidebar li button.folder-row { color: var(--fg-muted); display: flex; align-items: center; gap: 7px; }
 .sidebar li button.folder-row:hover { color: var(--fg); }
-.row-icon { font-size: 12px; line-height: 1; flex: 0 0 auto; }
 
 .context-menu { position: fixed; z-index: 1002; background: var(--bg-elevated); border: 1px solid var(--border);
-  border-radius: 8px; box-shadow: var(--shadow); padding: 4px; min-width: 170px; }
-.context-menu button { width: 100%; text-align: left; background: none; border: 0; color: var(--fg);
-  padding: 6px 9px; border-radius: 6px; cursor: pointer; font: inherit; font-size: 13px; white-space: nowrap; }
-.context-menu button:hover { background: var(--accent-soft); color: var(--accent); }
+  border-radius: 8px; box-shadow: var(--shadow); padding: 4px; min-width: 180px; outline: 0;
+  font-family: var(--ui-font); }
+.context-menu button { width: 100%; display: flex; align-items: center; justify-content: space-between;
+  gap: 18px; text-align: left; background: none; border: 0; color: var(--fg); padding: 6px 9px;
+  border-radius: 6px; cursor: pointer; font: inherit; font-size: 13px; white-space: nowrap; }
+.context-menu button:hover:not(:disabled), .context-menu button:focus-visible {
+  background: var(--accent-soft); color: var(--accent); }
+.context-menu button:disabled { color: var(--fg-muted); opacity: 0.5; cursor: default; }
+.menu-keys { display: inline-flex; gap: 3px; color: var(--fg-muted); }
+.menu-sep { height: 1px; margin: 4px 6px; background: var(--border); }
 
 /* ── Editor / preview split ────────────────────────────── */
 .content-area { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
@@ -157,9 +224,11 @@ body { font-family: var(--ui-font); color: var(--fg); background: var(--bg); }
 .tab-open:hover { color: var(--fg); }
 .tab-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tab-dot { flex: 0 0 auto; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
-.tab-close { flex: 0 0 auto; background: none; border: 0; color: var(--fg-muted); cursor: pointer;
-  font-size: 15px; line-height: 1; padding: 4px 10px; }
-.tab-close:hover { color: var(--accent); }
+.tab-close { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; margin-right: 6px; padding: 0; background: none; border: 0;
+  border-radius: 5px; color: var(--fg-muted); cursor: pointer; opacity: 0.55; }
+.tab:hover .tab-close, .tab.active .tab-close, .tab-close:focus-visible { opacity: 1; }
+.tab-close:hover { color: var(--accent); background: var(--accent-soft); }
 
 .split { flex: 1; display: flex; min-width: 0; min-height: 0; }
 .divider { width: 6px; cursor: col-resize; background: var(--border); flex: 0 0 auto; }
@@ -287,3 +356,7 @@ mark.find-hit-active { background: var(--accent); color: var(--bg); }
 .img-dims { color: var(--fg-muted); font-size: 12px; }
 .img-status, .img-error { padding: 40px 28px; color: var(--fg-muted); font-size: 14px; }
 .img-error { color: var(--accent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tip { transition: none; }
+}
